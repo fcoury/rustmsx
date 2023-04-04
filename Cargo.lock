@@ -572,6 +572,8 @@ name = "rustmsx"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "gloo",
+ "js-sys",
  "serde",
  "serde-big-array",
  "serde_json",

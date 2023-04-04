@@ -1,31 +1,16 @@
-use web_sys::File;
-use yew::prelude::*;
-
-use components::file_upload_button::FileUploadButton;
-
 mod components;
+mod layout;
 mod msx;
 
-#[function_component]
-fn Navbar() -> Html {
-    let on_upload = Callback::from(|file: File| {
-        tracing::debug!("File: {:?}", file);
-    });
+use std::{cell::RefCell, rc::Rc};
 
-    html! {
-        <div class="navbar">
-            <div class="navbar__item">
-                <FileUploadButton on_upload={on_upload}>{ "Open ROM" }</FileUploadButton>
-            </div>
-            <div class="navbar__item">
-                <button>{ "Refresh" }</button>
-            </div>
-            <div class="navbar__item">
-                <button>{ "Step" }</button>
-            </div>
-        </div>
-    }
-}
+use gloo::file::File;
+use yew::prelude::*;
+
+use components::Hexdump;
+use msx::Msx;
+
+use crate::layout::Navbar;
 
 #[function_component]
 fn Program() -> Html {
@@ -59,19 +44,6 @@ fn Registers() -> Html {
 }
 
 #[function_component]
-fn Hexdump() -> Html {
-    html! {
-        <div className="hexdump">
-            <div className="hexdump__entry">
-                <div className="hexdump__address">{ "0000" }</div>
-                <div className="hexdump__contents"></div>
-                <div className="hexdump__contents"></div>
-            </div>
-        </div>
-    }
-}
-
-#[function_component]
 fn Memory() -> Html {
     html! {
         <div class="memory">
@@ -82,9 +54,17 @@ fn Memory() -> Html {
 
 #[function_component]
 fn App() -> Html {
+    let msx = Rc::new(RefCell::new(Msx::new()));
+
+    let handle_rom_upload = Callback::from(move |data: Vec<u8>| {
+        let mut msx = msx.borrow_mut();
+        msx.load_rom(&data).unwrap();
+        tracing::info!("Loaded!");
+    });
+
     html! {
         <div class="container">
-            <Navbar />
+            <Navbar on_rom_upload={handle_rom_upload} />
             <div class="main">
                 <Program />
                 <div class="status">
