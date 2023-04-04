@@ -11,7 +11,7 @@ pub struct Props {
 pub fn Memory(props: &Props) -> Html {
     html! {
         <div class="memory">
-            <Hexdump data={props.clone().data} />
+            <Hexdump data={props.clone().data} columns={16} />
         </div>
     }
 }

@@ -7,15 +7,11 @@ use std::{
     sync::{Arc, RwLock},
 };
 
+use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 
-use crate::msx::components::{bus::Bus, cpu::Z80, memory::Memory, sound::AY38910, vdp::TMS9918};
-
 use self::components::instruction::Instruction;
-
-// "address": format!("{:04X}", pc),
-// "instruction": instr.name(),
-// "hexcontents": instr.opcode_with_args(),
+use crate::msx::components::{bus::Bus, cpu::Z80, memory::Memory, sound::AY38910, vdp::TMS9918};
 
 #[derive(Clone, PartialEq)]
 pub struct ProgramEntry {
@@ -24,13 +20,15 @@ pub struct ProgramEntry {
     pub data: String,
 }
 
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Derivative, Serialize, Deserialize)]
+#[derivative(Clone, PartialEq)]
 pub struct Msx {
     pub cpu: Z80,
     pub vdp: TMS9918,
     pub psg: AY38910,
 
     current_scanline: u16,
+    running: bool,
 
     // debug options
     pub breakpoints: Vec<u16>,
@@ -40,6 +38,24 @@ pub struct Msx {
     pub track_flags: bool,
     pub previous_memory: Option<Vec<u8>>,
     pub memory_hash: u64,
+
+    // events subscriber
+    #[serde(skip)]
+    #[derivative(PartialEq = "ignore", Clone(clone_with = "always_none"))]
+    subscriber: Option<Box<dyn Fn(EventType) + 'static>>,
+}
+
+fn always_none<T>(_original: &Option<T>) -> Option<T> {
+    None
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum EventType {
+    RomLoaded,
+    Breakpoint,
+    Halt,
+    MemoryUpdate { address: u16, value: u8 },
+    Cycle,
 }
 
 impl Msx {
@@ -61,7 +77,17 @@ impl Msx {
             breakpoints: Vec::new(),
             previous_memory: None,
             memory_hash: 0,
+            subscriber: None,
+            running: false,
         }
+    }
+
+    pub fn subscribe(&mut self, subscriber: Box<dyn Fn(EventType)>) {
+        self.subscriber = Some(subscriber);
+    }
+
+    fn notify(&self, event: EventType) {
+        self.subscriber.as_ref().map_or((), |f| f(event.clone()));
     }
 
     pub fn add_breakpoint(&mut self, address: u16) {
@@ -84,6 +110,7 @@ impl Msx {
 
     pub fn load_rom(&mut self, rom: &[u8]) -> anyhow::Result<()> {
         self.cpu.memory.load_bios(rom)?;
+        self.notify(EventType::RomLoaded);
 
         Ok(())
     }
@@ -129,7 +156,16 @@ impl Msx {
         self.psg.reset();
     }
 
+    pub fn stop(&mut self) {
+        self.running = false;
+    }
+
+    pub fn toggle(&mut self) {
+        self.running = !self.running;
+    }
+
     pub fn run(&mut self) -> anyhow::Result<()> {
+        self.running = true;
         self.cpu.max_cycles = self.max_cycles;
         self.cpu.track_flags = self.track_flags;
 
@@ -137,8 +173,9 @@ impl Msx {
 
         loop {
             self.cpu.execute_cycle();
+            self.notify(EventType::Cycle);
 
-            let mut stop = false;
+            let mut stop = !self.running;
 
             if self.breakpoints.contains(&self.cpu.pc) {
                 println!("Breakpoint hit at {:#06X}", self.cpu.pc);

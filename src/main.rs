@@ -4,33 +4,50 @@ mod msx;
 
 use std::sync::{Arc, RwLock};
 
+use gloo::timers::callback::Interval;
 use yew::prelude::*;
 
 use msx::Msx;
 
-use crate::layout::{Memory, Navbar, Program, Registers};
+use crate::{
+    layout::{Memory, Navbar, Program, Registers},
+    msx::EventType,
+};
 
 struct App {
     msx: Arc<RwLock<Msx>>,
+    interval: Option<Interval>,
 }
 
 enum Msg {
     RomLoaded(Vec<u8>),
     Step,
-    Run,
+    Start,
+    Pause,
+    Tick,
+    MsxEvent(EventType),
 }
 
 impl Component for App {
     type Message = Msg;
     type Properties = ();
 
-    fn create(_ctx: &Context<Self>) -> Self {
+    fn create(ctx: &Context<Self>) -> Self {
+        let mut msx = Msx::new();
+        let link = ctx.link().clone();
+        msx.subscribe(Box::new(move |event| {
+            link.send_message(Msg::MsxEvent(event));
+        }));
+
+        let msx = Arc::new(RwLock::new(msx));
+
         Self {
-            msx: Arc::new(RwLock::new(Msx::new())),
+            msx,
+            interval: None,
         }
     }
 
-    fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
+    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
             Msg::RomLoaded(data) => {
                 let mut msx = self.msx.write().unwrap();
@@ -42,10 +59,28 @@ impl Component for App {
                 msx.step();
                 true
             }
-            Msg::Run => {
-                let mut msx = self.msx.write().unwrap();
-                msx.run().unwrap();
+            Msg::Start => {
+                let handle = {
+                    let link = ctx.link().clone();
+                    Interval::new(1000 / 60, move || {
+                        link.send_message(Msg::Tick);
+                    })
+                };
+                self.interval = Some(handle);
                 true
+            }
+            Msg::Pause => {
+                self.interval.take().unwrap().cancel();
+                true
+            }
+            Msg::Tick => {
+                let mut msx = self.msx.write().unwrap();
+                msx.step();
+                true
+            }
+            Msg::MsxEvent(event) => {
+                tracing::debug!("Other: {:?}", event);
+                false
             }
         }
     }
@@ -67,8 +102,13 @@ impl Component for App {
         });
 
         let link = ctx.link().clone();
+        let has_interval = self.interval.is_some();
         let handle_run = Callback::from(move |_| {
-            link.send_message(Msg::Run);
+            if has_interval {
+                link.send_message(Msg::Pause);
+                return;
+            }
+            link.send_message(Msg::Start);
         });
 
         html! {
