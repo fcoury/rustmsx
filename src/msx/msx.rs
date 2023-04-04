@@ -7,7 +7,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use crate::components::{bus::Bus, cpu::Z80, memory::Memory, sound::AY38910, vdp::TMS9918};
+use crate::msx::components::{bus::Bus, cpu::Z80, memory::Memory, sound::AY38910, vdp::TMS9918};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Msx {

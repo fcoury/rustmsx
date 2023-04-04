@@ -1,49 +1,21 @@
-use wasm_bindgen::prelude::*;
+use web_sys::File;
 use yew::prelude::*;
+
+use components::file_upload_button::FileUploadButton;
 
 mod components;
 mod msx;
 
 #[function_component]
 fn Navbar() -> Html {
-    let on_open_rom = Callback::from(|_| {
-        let input = web_sys::window()
-            .unwrap()
-            .document()
-            .unwrap()
-            .create_element("input")
-            .unwrap();
-        input.set_attribute("type", "file").unwrap();
-        input.set_attribute("accept", ".rom").unwrap();
-        input.set_attribute("style", "display: none").unwrap();
-        input.set_attribute("id", "file-input").unwrap();
-        input
-            .set_attribute("onchange", "console.log(this.files)")
-            .unwrap();
-        web_sys::window()
-            .unwrap()
-            .document()
-            .unwrap()
-            .body()
-            .unwrap()
-            .append_child(&input)
-            .unwrap();
-        let input = web_sys::window()
-            .unwrap()
-            .document()
-            .unwrap()
-            .get_element_by_id("file-input")
-            .unwrap();
-        input
-            .dyn_ref::<web_sys::HtmlInputElement>()
-            .unwrap()
-            .click();
+    let on_upload = Callback::from(|file: File| {
+        tracing::debug!("File: {:?}", file);
     });
 
     html! {
         <div class="navbar">
             <div class="navbar__item">
-                <button onclick={on_open_rom.clone()}>{ "Open ROM" }</button>
+                <FileUploadButton on_upload={on_upload}>{ "Open ROM" }</FileUploadButton>
             </div>
             <div class="navbar__item">
                 <button>{ "Refresh" }</button>
@@ -127,5 +99,7 @@ fn App() -> Html {
 }
 
 fn main() {
+    tracing_wasm::set_as_global_default();
+
     yew::Renderer::<App>::new().render();
 }
