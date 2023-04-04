@@ -6,19 +6,9 @@ use std::sync::{Arc, RwLock};
 
 use yew::prelude::*;
 
-use components::Hexdump;
 use msx::Msx;
 
-use crate::layout::{Navbar, Program, Registers};
-
-#[function_component]
-fn Memory() -> Html {
-    html! {
-        <div class="memory">
-            <Hexdump />
-        </div>
-    }
-}
+use crate::layout::{Memory, Navbar, Program, Registers};
 
 struct App {
     msx: Arc<RwLock<Msx>>,
@@ -27,6 +17,7 @@ struct App {
 enum Msg {
     RomLoaded(Vec<u8>),
     Step,
+    Run,
 }
 
 impl Component for App {
@@ -51,6 +42,11 @@ impl Component for App {
                 msx.step();
                 true
             }
+            Msg::Run => {
+                let mut msx = self.msx.write().unwrap();
+                msx.run().unwrap();
+                true
+            }
         }
     }
 
@@ -70,16 +66,21 @@ impl Component for App {
             link.send_message(Msg::Step);
         });
 
+        let link = ctx.link().clone();
+        let handle_run = Callback::from(move |_| {
+            link.send_message(Msg::Run);
+        });
+
         html! {
             <div id="root">
                 <div class="container">
-                    <Navbar on_rom_upload={handle_rom_upload} on_step={handle_step} />
+                    <Navbar on_rom_upload={handle_rom_upload} on_step={handle_step} on_run={handle_run} />
                     <div class="main">
-                        <Program data={program} pc={cpu.pc} />
+                        <Program data={program} pc={&cpu.pc} />
                         <div class="status">
-                            <Registers cpu={cpu} />
+                            <Registers cpu={cpu.clone()} />
                             <div class="split">
-                                <Memory />
+                                <Memory data={cpu.memory.data} />
                             </div>
                         </div>
                     </div>

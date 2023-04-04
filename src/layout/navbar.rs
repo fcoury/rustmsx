@@ -6,14 +6,21 @@ use crate::components::FileUploadButton;
 pub struct Props {
     pub on_rom_upload: Callback<Vec<u8>>,
     pub on_step: Callback<()>,
+    pub on_run: Callback<()>,
 }
 
 #[function_component]
 pub fn Navbar(props: &Props) -> Html {
     let on_rom_upload = props.on_rom_upload.clone();
+
     let props = props.clone();
     let handle_step_click = Callback::from(move |_| {
         props.on_step.emit(());
+    });
+
+    // let props = props.clone();
+    let handle_run_click = Callback::from(move |_| {
+        props.on_run.emit(());
     });
 
     html! {
@@ -26,6 +33,9 @@ pub fn Navbar(props: &Props) -> Html {
             </div>
             <div class="navbar__item">
                 <button onclick={handle_step_click}>{ "Step" }</button>
+            </div>
+            <div class="navbar__item">
+                <button onclick={handle_run_click}>{ "Run" }</button>
             </div>
         </div>
     }
