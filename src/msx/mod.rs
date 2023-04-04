@@ -109,6 +109,7 @@ impl Msx {
     }
 
     pub fn load_rom(&mut self, rom: &[u8]) -> anyhow::Result<()> {
+        self.reset();
         self.cpu.memory.load_bios(rom)?;
         self.notify(EventType::RomLoaded);
 
