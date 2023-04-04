@@ -107,7 +107,7 @@ body {
   padding: 2px 0 2px 20px;
 }
 
-.opcode.selected {
+.opcode--current {
   background-color: var(--dark-4);
 }
 

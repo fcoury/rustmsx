@@ -9,19 +9,36 @@ pub struct Props {
 
 #[function_component]
 pub fn Registers(props: &Props) -> Html {
+    let cpu = &props.cpu;
     html! {
         <div class="registers">
             <div class="register">
                 <div class="register__name">{ "PC" }</div>
-                <div class="register__value">{ props.cpu.pc }</div>
+                <div class="register__value">{ format!("{:04X}", cpu.pc) }</div>
             </div>
             <div class="register">
                 <div class="register__name">{ "A" }</div>
-                <div class="register__value">{ "F0" }</div>
+                <div class="register__value">{ format!("{:02X}", cpu.a ) }</div>
             </div>
             <div class="register">
                 <div class="register__name">{ "B" }</div>
-                <div class="register__value">{ "00" }</div>
+                <div class="register__value">{ format!("{:02X}", cpu.b ) }</div>
+            </div>
+            <div class="register">
+                <div class="register__name">{ "C" }</div>
+                <div class="register__value">{ format!("{:02X}", cpu.c ) }</div>
+            </div>
+            <div class="register">
+                <div class="register__name">{ "D" }</div>
+                <div class="register__value">{ format!("{:02X}", cpu.d ) }</div>
+            </div>
+            <div class="register">
+                <div class="register__name">{ "E" }</div>
+                <div class="register__value">{ format!("{:02X}", cpu.d ) }</div>
+            </div>
+            <div class="register">
+                <div class="register__name">{ "F" }</div>
+                <div class="register__value">{ format!("{:02X}", cpu.f ) }</div>
             </div>
         </div>
     }

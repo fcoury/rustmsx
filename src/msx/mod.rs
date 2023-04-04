@@ -19,7 +19,7 @@ use self::components::instruction::Instruction;
 
 #[derive(Clone, PartialEq)]
 pub struct ProgramEntry {
-    pub address: String,
+    pub address: u16,
     pub instruction: String,
     pub data: String,
 }
@@ -112,7 +112,7 @@ impl Msx {
 
             let instr = Instruction::parse(&self.cpu.memory, pc);
             program.push(ProgramEntry {
-                address: format!("{:04X}", pc),
+                address: pc,
                 instruction: instr.name().to_string(),
                 data: instr.opcode_with_args(),
             });
@@ -164,5 +164,9 @@ impl Msx {
         }
 
         Ok(())
+    }
+
+    pub fn step(&mut self) {
+        self.cpu.execute_cycle();
     }
 }

@@ -2,11 +2,7 @@ mod components;
 mod layout;
 mod msx;
 
-use std::{
-    cell::RefCell,
-    rc::Rc,
-    sync::{Arc, RwLock},
-};
+use std::sync::{Arc, RwLock};
 
 use yew::prelude::*;
 
@@ -30,6 +26,7 @@ struct App {
 
 enum Msg {
     RomLoaded(Vec<u8>),
+    Step,
 }
 
 impl Component for App {
@@ -49,6 +46,11 @@ impl Component for App {
                 msx.load_rom(&data).unwrap();
                 true
             }
+            Msg::Step => {
+                let mut msx = self.msx.write().unwrap();
+                msx.step();
+                true
+            }
         }
     }
 
@@ -63,12 +65,17 @@ impl Component for App {
             tracing::info!("Loaded!");
         });
 
+        let link = ctx.link().clone();
+        let handle_step = Callback::from(move |_| {
+            link.send_message(Msg::Step);
+        });
+
         html! {
             <div id="root">
                 <div class="container">
-                    <Navbar on_rom_upload={handle_rom_upload} />
+                    <Navbar on_rom_upload={handle_rom_upload} on_step={handle_step} />
                     <div class="main">
-                        <Program data={program} />
+                        <Program data={program} pc={cpu.pc} />
                         <div class="status">
                             <Registers cpu={cpu} />
                             <div class="split">
