@@ -1,9 +1,50 @@
+use wasm_bindgen::prelude::*;
 use yew::prelude::*;
+
+mod components;
+mod msx;
 
 #[function_component]
 fn Navbar() -> Html {
+    let on_open_rom = Callback::from(|_| {
+        let input = web_sys::window()
+            .unwrap()
+            .document()
+            .unwrap()
+            .create_element("input")
+            .unwrap();
+        input.set_attribute("type", "file").unwrap();
+        input.set_attribute("accept", ".rom").unwrap();
+        input.set_attribute("style", "display: none").unwrap();
+        input.set_attribute("id", "file-input").unwrap();
+        input
+            .set_attribute("onchange", "console.log(this.files)")
+            .unwrap();
+        web_sys::window()
+            .unwrap()
+            .document()
+            .unwrap()
+            .body()
+            .unwrap()
+            .append_child(&input)
+            .unwrap();
+        let input = web_sys::window()
+            .unwrap()
+            .document()
+            .unwrap()
+            .get_element_by_id("file-input")
+            .unwrap();
+        input
+            .dyn_ref::<web_sys::HtmlInputElement>()
+            .unwrap()
+            .click();
+    });
+
     html! {
         <div class="navbar">
+            <div class="navbar__item">
+                <button onclick={on_open_rom.clone()}>{ "Open ROM" }</button>
+            </div>
             <div class="navbar__item">
                 <button>{ "Refresh" }</button>
             </div>
