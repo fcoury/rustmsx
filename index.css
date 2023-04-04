@@ -1,0 +1,179 @@
+/**
+ * Inspirations:
+ *
+ * - https://coolors.co/palette/02010a-04052e-140152-22007c-0d00a4
+ * - https://coolors.co/palette/3a015c-32004f-220135-190028-11001c
+ */
+
+:root {
+  --dark-0: #11001c;
+  --dark-1: #190028;
+  --dark-2: #220135;
+  --dark-3: #32004f;
+  --dark-4: #3a015c;
+
+  --text-0: #b1eeff;
+  --text-1: #64deff;
+  --text-2: #16cdff;
+  --text-3: #009dc8;
+  --text-4: #00607a;
+}
+
+body {
+  font-family: "Roboto Mono", monospace;
+  background: var(--dark-0);
+  color: var(--text-1);
+  margin: 0;
+}
+
+/* WebKit-based browsers */
+::-webkit-scrollbar {
+  width: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background-color: var(--dark-1);
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--dark-4);
+  border-radius: 5px;
+}
+
+.container {
+  flex-direction: column;
+  height: 100vh;
+  width: 100%;
+}
+
+.navbar {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  height: 60px;
+  background-color: var(--dark-3);
+}
+
+.navbar__item {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  width: 100%;
+  height: calc(100vh - 60px);
+  scrollbar-width: thin;
+}
+
+.opcodes {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  padding: 20px;
+  overflow: auto;
+}
+
+.status {
+  flex: 3;
+  display: flex;
+  flex-direction: column;
+}
+
+.registers {
+  display: flex;
+  flex-direction: row;
+  box-sizing: border-box;
+  padding: 20px;
+  background-color: var(--dark-2);
+  justify-content: space-evenly;
+}
+
+.split {
+  flex: 1;
+  display: flex;
+  overflow: auto;
+}
+
+.opcode {
+  display: flex;
+  box-sizing: border-box;
+  padding: 2px 0 2px 20px;
+}
+
+.opcode.selected {
+  background-color: var(--dark-4);
+}
+
+.opcode__address {
+  margin-right: 15px;
+}
+
+.opcode__hex,
+.opcode__instruction {
+  flex: 1;
+}
+
+.register {
+  display: flex;
+  flex-direction: column;
+}
+
+/* .register__name,
+.register__value {
+} */
+
+.register__value {
+  border-top: 1px solid var(--text-4);
+}
+
+.flags {
+  flex: 1;
+}
+
+.memory,
+.vram {
+  flex: 1;
+  margin: 20px;
+}
+
+.display {
+  flex: 1;
+}
+
+.hexdump {
+  flex: 1;
+}
+
+.hexdump__entry {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+}
+
+.hexdump__address {
+  margin-right: 20px;
+}
+
+.hexdump__contents {
+  display: flex;
+  margin-right: 20px;
+}
+
+.hexdump__content {
+  margin-right: 10px;
+}
+
+.hexdump__content--changed {
+  background-color: #ffeb3b; /* You can use any color of your choice */
+}
+
+.hexdump__content:nth-child(9) {
+  margin-left: 10px;
+}
