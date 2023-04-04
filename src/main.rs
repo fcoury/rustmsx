@@ -62,7 +62,7 @@ impl Component for App {
             Msg::Start => {
                 let handle = {
                     let link = ctx.link().clone();
-                    Interval::new(1000 / 60, move || {
+                    Interval::new(1, move || {
                         link.send_message(Msg::Tick);
                     })
                 };

@@ -3,7 +3,6 @@ pub mod components;
 use std::{
     fs::File,
     io::Read,
-    path::PathBuf,
     sync::{Arc, RwLock},
 };
 
@@ -90,6 +89,7 @@ impl Msx {
         self.subscriber.as_ref().map_or((), |f| f(event.clone()));
     }
 
+    #[allow(unused)]
     pub fn add_breakpoint(&mut self, address: u16) {
         self.breakpoints.push(address);
     }
@@ -112,15 +112,6 @@ impl Msx {
         self.reset();
         self.cpu.memory.load_bios(rom)?;
         self.notify(EventType::RomLoaded);
-
-        Ok(())
-    }
-
-    pub fn load_bios(&mut self, path: PathBuf) -> std::io::Result<()> {
-        let mut file = File::open(path)?;
-        let mut buffer = Vec::new();
-        file.read_to_end(&mut buffer)?;
-        self.cpu.memory.load_bios(&buffer)?;
 
         Ok(())
     }
@@ -157,52 +148,44 @@ impl Msx {
         self.psg.reset();
     }
 
-    pub fn stop(&mut self) {
-        self.running = false;
-    }
+    // pub fn run(&mut self) -> anyhow::Result<()> {
+    //     self.running = true;
+    //     self.cpu.max_cycles = self.max_cycles;
+    //     self.cpu.track_flags = self.track_flags;
 
-    pub fn toggle(&mut self) {
-        self.running = !self.running;
-    }
+    //     let mut stop_next = false;
 
-    pub fn run(&mut self) -> anyhow::Result<()> {
-        self.running = true;
-        self.cpu.max_cycles = self.max_cycles;
-        self.cpu.track_flags = self.track_flags;
+    //     loop {
+    //         self.cpu.execute_cycle();
+    //         self.notify(EventType::Cycle);
 
-        let mut stop_next = false;
+    //         let mut stop = !self.running;
 
-        loop {
-            self.cpu.execute_cycle();
-            self.notify(EventType::Cycle);
+    //         if self.breakpoints.contains(&self.cpu.pc) {
+    //             println!("Breakpoint hit at {:#06X}", self.cpu.pc);
+    //             stop = true;
+    //         }
 
-            let mut stop = !self.running;
+    //         if stop || stop_next {
+    //             if stop_next {
+    //                 println!("Stepped to {:#06X}", self.cpu.pc);
+    //             }
+    //             stop_next = false;
+    //         }
 
-            if self.breakpoints.contains(&self.cpu.pc) {
-                println!("Breakpoint hit at {:#06X}", self.cpu.pc);
-                stop = true;
-            }
+    //         if self.cpu.halted {
+    //             break;
+    //         }
 
-            if stop || stop_next {
-                if stop_next {
-                    println!("Stepped to {:#06X}", self.cpu.pc);
-                }
-                stop_next = false;
-            }
+    //         self.current_scanline = (self.current_scanline + 1) % 192;
+    //         if self.current_scanline == 0 {
+    //             // renderer.draw(0, 0, 256, 192);
+    //             // display.update_screen(&renderer.screen_buffer);
+    //         }
+    //     }
 
-            if self.cpu.halted {
-                break;
-            }
-
-            self.current_scanline = (self.current_scanline + 1) % 192;
-            if self.current_scanline == 0 {
-                // renderer.draw(0, 0, 256, 192);
-                // display.update_screen(&renderer.screen_buffer);
-            }
-        }
-
-        Ok(())
-    }
+    //     Ok(())
+    // }
 
     pub fn step(&mut self) {
         self.cpu.execute_cycle();
