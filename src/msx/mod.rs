@@ -11,7 +11,20 @@ use serde::{Deserialize, Serialize};
 
 use crate::msx::components::{bus::Bus, cpu::Z80, memory::Memory, sound::AY38910, vdp::TMS9918};
 
-#[derive(Clone, Serialize, Deserialize)]
+use self::components::instruction::Instruction;
+
+// "address": format!("{:04X}", pc),
+// "instruction": instr.name(),
+// "hexcontents": instr.opcode_with_args(),
+
+#[derive(Clone, PartialEq)]
+pub struct ProgramEntry {
+    pub address: String,
+    pub instruction: String,
+    pub data: String,
+}
+
+#[derive(Clone, Serialize, Deserialize, PartialEq)]
 pub struct Msx {
     pub cpu: Z80,
     pub vdp: TMS9918,
@@ -82,6 +95,31 @@ impl Msx {
         self.cpu.memory.load_bios(&buffer)?;
 
         Ok(())
+    }
+
+    pub fn program(&self) -> Vec<ProgramEntry> {
+        let mut program = Vec::new();
+        let mut pc = self.cpu.pc;
+
+        loop {
+            if pc.checked_add(1).is_none() {
+                break;
+            }
+
+            if program.len() > 100 {
+                break;
+            }
+
+            let instr = Instruction::parse(&self.cpu.memory, pc);
+            program.push(ProgramEntry {
+                address: format!("{:04X}", pc),
+                instruction: instr.name().to_string(),
+                data: instr.opcode_with_args(),
+            });
+            pc += instr.len() as u16;
+        }
+
+        program
     }
 
     #[allow(unused)]

@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use tracing::trace;
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct AY38910 {
     registers: [u8; 16],
     selected_register: u8,

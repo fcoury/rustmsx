@@ -3,7 +3,7 @@ use tracing::error;
 
 use super::{ppi::Ppi, sound::AY38910, vdp::TMS9918};
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Bus {
     slot_count: u8,
 

@@ -3,6 +3,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
+use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 use tracing::{error, info, trace};
 
@@ -28,8 +29,10 @@ pub enum Flag {
     C = 0x01, // Carry
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Derivative, Serialize, Deserialize)]
+#[derivative(Clone, PartialEq)]
 pub struct Z80 {
+    #[derivative(PartialEq = "ignore")]
     #[serde(skip)]
     pub bus: Arc<RwLock<Bus>>,
 

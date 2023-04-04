@@ -2,46 +2,18 @@ mod components;
 mod layout;
 mod msx;
 
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::RefCell,
+    rc::Rc,
+    sync::{Arc, RwLock},
+};
 
-use gloo::file::File;
 use yew::prelude::*;
 
 use components::Hexdump;
 use msx::Msx;
 
-use crate::layout::Navbar;
-
-#[function_component]
-fn Program() -> Html {
-    html! {
-        <div className="opcodes">
-            <div class="opcode">
-                <div class="opcode__column opcode__address">{ "0010" }</div>
-                <div class="opcode__column opcode__hex">{ "AE 2D" }</div>
-                <div class="opcode__column opcode__instruction">
-                    { "ADD A, B" }
-                </div>
-            </div>
-        </div>
-    }
-}
-
-#[function_component]
-fn Registers() -> Html {
-    html! {
-        <div class="registers">
-            <div class="register">
-                <div class="register__name">{ "A" }</div>
-                <div class="register__value">{ "F0" }</div>
-            </div>
-            <div class="register">
-                <div class="register__name">{ "B" }</div>
-                <div class="register__value">{ "00" }</div>
-            </div>
-        </div>
-    }
-}
+use crate::layout::{Navbar, Program, Registers};
 
 #[function_component]
 fn Memory() -> Html {
@@ -52,29 +24,61 @@ fn Memory() -> Html {
     }
 }
 
-#[function_component]
-fn App() -> Html {
-    let msx = Rc::new(RefCell::new(Msx::new()));
+struct App {
+    msx: Arc<RwLock<Msx>>,
+}
 
-    let handle_rom_upload = Callback::from(move |data: Vec<u8>| {
-        let mut msx = msx.borrow_mut();
-        msx.load_rom(&data).unwrap();
-        tracing::info!("Loaded!");
-    });
+enum Msg {
+    RomLoaded(Vec<u8>),
+}
 
-    html! {
-        <div class="container">
-            <Navbar on_rom_upload={handle_rom_upload} />
-            <div class="main">
-                <Program />
-                <div class="status">
-                    <Registers />
-                    <div class="split">
-                        <Memory />
+impl Component for App {
+    type Message = Msg;
+    type Properties = ();
+
+    fn create(_ctx: &Context<Self>) -> Self {
+        Self {
+            msx: Arc::new(RwLock::new(Msx::new())),
+        }
+    }
+
+    fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
+        match msg {
+            Msg::RomLoaded(data) => {
+                let mut msx = self.msx.write().unwrap();
+                msx.load_rom(&data).unwrap();
+                true
+            }
+        }
+    }
+
+    fn view(&self, ctx: &Context<Self>) -> Html {
+        let msx = self.msx.read().unwrap();
+        let cpu = msx.cpu.clone();
+        let program = msx.program();
+
+        let link = ctx.link().clone();
+        let handle_rom_upload = Callback::from(move |data: Vec<u8>| {
+            link.send_message(Msg::RomLoaded(data));
+            tracing::info!("Loaded!");
+        });
+
+        html! {
+            <div id="root">
+                <div class="container">
+                    <Navbar on_rom_upload={handle_rom_upload} />
+                    <div class="main">
+                        <Program data={program} />
+                        <div class="status">
+                            <Registers cpu={cpu} />
+                            <div class="split">
+                                <Memory />
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+        }
     }
 }
 

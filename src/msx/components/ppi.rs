@@ -2,7 +2,7 @@
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct Ppi {
     register_a: u8,
     register_b: u8,

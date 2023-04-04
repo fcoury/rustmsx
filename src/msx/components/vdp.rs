@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 use tracing::{error, info, trace};
 
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq)]
 pub struct Sprite {
     pub x: u8,
     pub y: u8,
@@ -13,7 +13,7 @@ pub struct Sprite {
     pub collision: bool,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TMS9918 {
     #[serde(with = "BigArray")]
     pub vram: [u8; 0x4000],

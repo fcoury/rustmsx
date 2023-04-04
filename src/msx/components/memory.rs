@@ -1,13 +1,16 @@
 use std::sync::{Arc, RwLock};
 
+use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
 use super::bus::Bus;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Derivative, Serialize, Deserialize)]
+#[derivative(Clone, Debug, PartialEq)]
 pub struct Memory {
     #[serde(skip)]
+    #[derivative(PartialEq = "ignore")]
     pub bus: Arc<RwLock<Bus>>,
     pub data: Vec<u8>,
 }
