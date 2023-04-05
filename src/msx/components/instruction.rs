@@ -151,6 +151,7 @@ impl Instruction {
             0x0C => ("INC C", 1),
             0x14 => ("INC D", 1),
             0x1C => ("INC E", 1),
+            0x03 => ("INC BC", 1),
             0x13 => ("INC DE", 1),
             0x23 => ("INC HL", 1),
             0x24 => ("INC H", 1),
@@ -333,6 +334,7 @@ impl Instruction {
                     0xB0 => ("LDIR", 2),
                     0x56 => ("IM 1", 2),
                     0xA3 => ("OUTI", 2),
+                    0x51 => ("OUT (C), D", 2),
                     _ => {
                         error!("Unknown opcode (ED) 0xED 0x{:02X}", extended_opcode);
                         ("Unknown", 1)

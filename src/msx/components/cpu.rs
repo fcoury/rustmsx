@@ -30,7 +30,7 @@ pub enum Flag {
 }
 
 #[derive(Derivative, Serialize, Deserialize)]
-#[derivative(Clone, PartialEq)]
+#[derivative(Debug, Clone, PartialEq)]
 pub struct Z80 {
     #[derivative(PartialEq = "ignore")]
     #[serde(skip)]
@@ -203,7 +203,7 @@ impl Z80 {
         // Fetch and decode the next instruction
         let opcode = self.memory.read_byte(self.pc);
         // if opcode > 0x00 {
-        //     info!("PC: 0x{:04X} Opcode: 0x{:02X}", self.pc, opcode);
+        info!("PC: 0x{:04X} Opcode: 0x{:02X}", self.pc, opcode);
         // }
         // trace!(
         //     "A: 0x{:02X} B: 0x{:02X} C: 0x{:02X} F: 0b{:b}",
@@ -760,6 +760,12 @@ impl Z80 {
                 self.pc = self.pc.wrapping_add(1);
                 self.e = self.e.wrapping_add(1);
                 self.set_inc_flags(self.e);
+            }
+            0x03 => {
+                // INC BC
+                let bc = self.get_bc();
+                self.set_bc(bc.wrapping_add(1));
+                self.pc = self.pc.wrapping_add(1);
             }
             0x13 => {
                 // INC DE
@@ -1651,7 +1657,6 @@ impl Z80 {
             0xF5 => {
                 // PUSH AF
                 trace!("PUSH AF");
-                self.pc = self.pc.wrapping_add(1);
                 self.push(self.get_af());
                 self.pc = self.pc.wrapping_add(1);
             }
@@ -1979,6 +1984,20 @@ impl Z80 {
                         self.b = self.b.wrapping_sub(1);
                         self.set_flag(Flag::P, self.b != 0);
                         trace!("OUTI");
+                    }
+                    0x51 => {
+                        // OUT (C), D
+                        let port = self.c;
+                        let value = self.d;
+                        {
+                            let mut bus = self
+                                .bus
+                                .write()
+                                .expect("Couldn't obtain a write lock on the bus.");
+                            bus.output(port, value);
+                        }
+                        self.pc = self.pc.wrapping_add(1);
+                        trace!("OUT (C), D");
                     }
                     // Add extended opcodes handling here
                     // 0x4A => self.sbc_hl(RegisterPair::BC),
