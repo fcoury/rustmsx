@@ -5,6 +5,7 @@ mod msx;
 use std::sync::{Arc, RwLock};
 
 use gloo::timers::callback::Interval;
+use layout::Vdp;
 use yew::prelude::*;
 
 use msx::Msx;
@@ -25,6 +26,7 @@ enum Msg {
     Start,
     Pause,
     Tick,
+    Refresh,
     MsxEvent(EventType),
 }
 
@@ -54,6 +56,11 @@ impl Component for App {
                 msx.load_rom(&data).unwrap();
                 true
             }
+            Msg::Refresh => {
+                let msx = self.msx.read().unwrap();
+                tracing::info!("MSX: {:#?}", msx.cpu);
+                true
+            }
             Msg::Step => {
                 let mut msx = self.msx.write().unwrap();
                 msx.step();
@@ -75,7 +82,9 @@ impl Component for App {
             }
             Msg::Tick => {
                 let mut msx = self.msx.write().unwrap();
-                msx.step();
+                for _ in 0..1000 {
+                    msx.step();
+                }
                 true
             }
             Msg::MsxEvent(event) => {
@@ -97,6 +106,11 @@ impl Component for App {
         });
 
         let link = ctx.link().clone();
+        let handle_refresh = Callback::from(move |_| {
+            link.send_message(Msg::Refresh);
+        });
+
+        let link = ctx.link().clone();
         let handle_step = Callback::from(move |_| {
             link.send_message(Msg::Step);
         });
@@ -114,13 +128,14 @@ impl Component for App {
         html! {
             <div id="root">
                 <div class="container">
-                    <Navbar on_rom_upload={handle_rom_upload} on_step={handle_step} on_run={handle_run} />
+                    <Navbar on_rom_upload={handle_rom_upload} on_refresh={handle_refresh} on_step={handle_step} on_run={handle_run} />
                     <div class="main">
                         <Program data={program} pc={&cpu.pc} />
                         <div class="status">
                             <Registers cpu={cpu.clone()} />
                             <div class="split">
                                 <Memory data={cpu.memory.data} />
+                                <Vdp data={msx.vdp.vram.to_vec()} />
                             </div>
                         </div>
                     </div>

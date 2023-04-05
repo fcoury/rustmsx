@@ -40,6 +40,22 @@ pub fn Registers(props: &Props) -> Html {
                 <div class="register__name">{ "F" }</div>
                 <div class="register__value">{ format!("{:02X}", cpu.f ) }</div>
             </div>
+            <div class="register">
+                <div class="register__name">{ "SP" }</div>
+                <div class="register__value">{ format!("{:04X}", cpu.sp ) }</div>
+            </div>
+            <div class="register">
+                <div class="register__name">{ "HL" }</div>
+                <div class="register__value">{ format!("{:04X}", cpu.get_hl() ) }</div>
+            </div>
+            <div class="register">
+                <div class="register__name">{ "AF" }</div>
+                <div class="register__value">{ format!("{:04X}", cpu.get_af() ) }</div>
+            </div>
+            <div class="register">
+                <div class="register__name">{ "BC" }</div>
+                <div class="register__value">{ format!("{:04X}", cpu.get_bc() ) }</div>
+            </div>
         </div>
     }
 }

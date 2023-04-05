@@ -8,10 +8,10 @@ pub struct Props {
 }
 
 #[function_component]
-pub fn Memory(props: &Props) -> Html {
+pub fn Vdp(props: &Props) -> Html {
     html! {
-        <div class="memory">
-            <Hexdump data={props.clone().data} columns={8} />
+        <div class="vram">
+            <Hexdump data={props.data.clone()} columns={8} />
         </div>
     }
 }
