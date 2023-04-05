@@ -4,7 +4,7 @@ mod msx;
 
 use std::sync::{Arc, RwLock};
 
-use gloo::timers::callback::Interval;
+use gloo::timers::callback::Timeout;
 use layout::Vdp;
 use yew::prelude::*;
 
@@ -17,7 +17,7 @@ use crate::{
 
 struct App {
     msx: Arc<RwLock<Msx>>,
-    interval: Option<Interval>,
+    timeout: Option<Timeout>,
 }
 
 enum Msg {
@@ -43,10 +43,7 @@ impl Component for App {
 
         let msx = Arc::new(RwLock::new(msx));
 
-        Self {
-            msx,
-            interval: None,
-        }
+        Self { msx, timeout: None }
     }
 
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
@@ -69,15 +66,15 @@ impl Component for App {
             Msg::Start => {
                 let handle = {
                     let link = ctx.link().clone();
-                    Interval::new(1, move || {
+                    Timeout::new(0, move || {
                         link.send_message(Msg::Tick);
                     })
                 };
-                self.interval = Some(handle);
+                self.timeout = Some(handle);
                 true
             }
             Msg::Pause => {
-                self.interval.take().unwrap().cancel();
+                self.timeout.take().unwrap().cancel();
                 true
             }
             Msg::Tick => {
@@ -85,6 +82,12 @@ impl Component for App {
                 for _ in 0..1000 {
                     msx.step();
                 }
+                drop(msx);
+
+                let link = ctx.link().clone();
+                self.timeout = Some(Timeout::new(0, move || {
+                    link.send_message(Msg::Tick);
+                }));
                 true
             }
             Msg::MsxEvent(event) => {
@@ -116,7 +119,7 @@ impl Component for App {
         });
 
         let link = ctx.link().clone();
-        let has_interval = self.interval.is_some();
+        let has_interval = self.timeout.is_some();
         let handle_run = Callback::from(move |_| {
             if has_interval {
                 link.send_message(Msg::Pause);
