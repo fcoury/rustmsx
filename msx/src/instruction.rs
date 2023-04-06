@@ -51,7 +51,8 @@ impl Instruction {
         let mut res = Vec::new();
         res.push(format!("{:02X}", self.opcode));
         for i in 1..length {
-            let arg = self.memory.read_byte(self.pc + i as u16);
+            let pc = self.pc.wrapping_add(i as u16);
+            let arg = self.memory.read_byte(pc);
             res.push(format!("{:02X}", arg));
         }
         res
@@ -61,7 +62,8 @@ impl Instruction {
         let (_, length) = self.as_def();
         let mut args = String::new();
         for i in 1..length {
-            let arg = self.memory.read_byte(self.pc + i as u16);
+            let pc = self.pc.wrapping_add(i as u16);
+            let arg = self.memory.read_byte(pc);
             args.push_str(&format!("{:02X} ", arg));
         }
 
