@@ -1983,6 +1983,7 @@ impl Z80 {
                         self.set_hl(self.get_hl().wrapping_add(1));
                         self.b = self.b.wrapping_sub(1);
                         self.set_flag(Flag::P, self.b != 0);
+                        self.pc = self.pc.wrapping_add(1);
                         trace!("OUTI");
                     }
                     0x51 => {
