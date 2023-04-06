@@ -2,7 +2,7 @@ use std::{rc::Rc, thread, time::Duration};
 
 use yewdux::{mrc::Mrc, prelude::*};
 
-use crate::msx::Msx;
+use crate::{layout::Renderer, msx::Msx};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Msg {
@@ -50,6 +50,15 @@ impl Reducer<ComputerState> for Msg {
 
                 for _ in 0..1000 {
                     state.msx.borrow_mut().step();
+
+                    if state.msx.borrow().current_scanline == 0 {
+                        let msx = state.msx.borrow();
+                        let vdp = msx.get_vdp();
+                        let mut renderer = Renderer::new(&vdp);
+                        renderer.draw(0, 0, 256, 192);
+                        state.screen_buffer = renderer.screen_buffer.to_vec();
+                    }
+
                     if state.state != ExecutionState::Running {
                         break;
                     }

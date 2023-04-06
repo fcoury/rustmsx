@@ -27,7 +27,7 @@ pub struct Msx {
     pub bus: Arc<RwLock<Bus>>,
     pub cpu: Z80,
 
-    current_scanline: u16,
+    pub current_scanline: u16,
     running: bool,
 
     // debug options
@@ -190,5 +190,6 @@ impl Msx {
 
     pub fn step(&mut self) {
         self.cpu.execute_cycle();
+        self.current_scanline = (self.current_scanline + 1) % 192;
     }
 }

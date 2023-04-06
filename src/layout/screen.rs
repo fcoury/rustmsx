@@ -1,40 +1,41 @@
-use gloo::timers::callback::Interval;
+use std::rc::Rc;
+
 use wasm_bindgen::{Clamped, JsCast};
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, ImageData};
 use yew::prelude::*;
+use yewdux::prelude::*;
+
+use crate::store::ComputerState;
 
 pub enum Msg {
-    UpdateScreen,
-}
-
-#[derive(Properties, Clone, PartialEq)]
-pub struct Props {
-    pub screen_buffer: Vec<u8>,
+    State(Rc<ComputerState>),
 }
 
 pub struct Screen {
     canvas_ref: NodeRef,
-    screen_buffer: Vec<u8>,
-    #[allow(dead_code)]
-    interval: Option<Interval>,
+    state: Rc<ComputerState>,
+    dispatch: Dispatch<ComputerState>,
 }
 
 impl Component for Screen {
     type Message = Msg;
-    type Properties = Props;
+    type Properties = ();
 
-    fn create(_ctx: &Context<Self>) -> Self {
+    fn create(ctx: &Context<Self>) -> Self {
+        let on_change = ctx.link().callback(Msg::State);
+        let dispatch = Dispatch::<ComputerState>::subscribe(on_change);
+
         Self {
             canvas_ref: NodeRef::default(),
-            screen_buffer: vec![0; 256 * 192],
-            interval: None,
+            state: dispatch.get(),
+            dispatch,
         }
     }
 
     fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
-            Msg::UpdateScreen => {
-                self.update_screen();
+            Msg::State(state) => {
+                self.update_screen(state.screen_buffer.clone());
             }
         }
         true
@@ -48,7 +49,11 @@ impl Component for Screen {
 }
 
 impl Screen {
-    fn update_screen(&mut self) {
+    fn update_screen(&mut self, screen_buffer: Vec<u8>) {
+        if screen_buffer.len() < 256 * 192 {
+            return;
+        }
+
         let canvas: HtmlCanvasElement = self.canvas_ref.cast().unwrap();
         let ctx = canvas.get_context("2d").unwrap().unwrap();
         let ctx = ctx.dyn_into::<CanvasRenderingContext2d>().unwrap();
@@ -65,11 +70,14 @@ impl Screen {
         for y in 0..height {
             for x in 0..width {
                 let color_offset = y * width + x;
-                let color = self.screen_buffer[color_offset];
-                let color_bytes = palette[color as usize].to_le_bytes();
+                let color = screen_buffer[color_offset];
+                let mut color_bytes = palette[color as usize].to_le_bytes();
+                color_bytes[3] = 255;
                 data.extend_from_slice(&color_bytes);
             }
         }
+
+        tracing::debug!("data: {:?}", data);
 
         let data = ImageData::new_with_u8_clamped_array_and_sh(
             Clamped(&data),
@@ -77,6 +85,7 @@ impl Screen {
             height as u32,
         )
         .unwrap();
+
         ctx.put_image_data(&data, 0.0, 0.0).unwrap();
     }
 }

@@ -5,7 +5,7 @@ use yew::prelude::*;
 use yewdux::prelude::*;
 
 use crate::{
-    layout::{Memory, Navbar, Program, Registers, Vdp},
+    layout::{Memory, Navbar, Program, Registers, Screen, Vdp},
     store::{self, ComputerState, ExecutionState},
 };
 
@@ -48,8 +48,11 @@ impl Component for App {
                         self.interval = Some(interval);
                     }
                 } else if let Some(interval) = self.interval.take() {
+                    tracing::debug!("Stopping interval");
                     interval.forget();
                     self.interval = None;
+                } else {
+                    tracing::debug!("Interval already stopped");
                 }
 
                 true
@@ -57,11 +60,11 @@ impl Component for App {
         }
     }
 
-    fn view(&self, ctx: &Context<Self>) -> Html {
+    fn view(&self, _ctx: &Context<Self>) -> Html {
         let msx = self.state.msx.borrow();
         let program = msx.program();
-        let vram = msx.vram();
-        let ram = msx.ram();
+        // let vram = msx.vram();
+        // let ram = msx.ram();
         let cpu = msx.cpu.clone();
 
         html! {
@@ -73,12 +76,12 @@ impl Component for App {
                         <div class="status">
                             <Registers cpu={msx.cpu.clone()} />
 
-                            // <Screen screen_buffer={vram.clone()} />
+                            <Screen />
 
-                            <div class="split">
-                                <Memory data={ram} />
-                                <Vdp data={vram} />
-                            </div>
+                            // <div class="split">
+                            //     <Memory data={ram} />
+                            //     <Vdp data={vram} />
+                            // </div>
                         </div>
                     </div>
                 </div>
