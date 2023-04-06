@@ -15,7 +15,7 @@ impl<'a> Renderer<'a> {
         // TODO check for text mode
         // TODO check for scroll delta
         let fg = 15; // TODO Pixel fg = palFg[vdp.getForegroundColor()];
-        let bg = 1; // TODO Pixel bg = palBg[vdp.getBackgroundColor()];
+        let bg = 4; // TODO Pixel bg = palBg[vdp.getBackgroundColor()];
 
         let screen_mode = 0;
         let height = y1 - y0;
