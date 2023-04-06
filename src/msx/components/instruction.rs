@@ -96,6 +96,7 @@ impl Instruction {
             0x45 => ("LD B, L", 1),
             0x4F => ("LD C, A", 1),
             0x48 => ("LD C, B", 1),
+            0x49 => ("LD C, C", 1),
             0x4A => ("LD C, D", 1),
             0x4B => ("LD C, E", 1),
             0x4C => ("LD C, H", 1),
@@ -333,6 +334,7 @@ impl Instruction {
                 match extended_opcode {
                     0xB0 => ("LDIR", 2),
                     0x56 => ("IM 1", 2),
+                    0xA2 => ("INI", 2),
                     0xA3 => ("OUTI", 2),
                     0x51 => ("OUT (C), D", 2),
                     _ => {

@@ -33,7 +33,7 @@ impl Reducer<ComputerState> for Msg {
     fn apply(self, mut store: Rc<ComputerState>) -> Rc<ComputerState> {
         let state = Rc::make_mut(&mut store);
 
-        tracing::info!("[{:?}] Received message: {:?}", state.state, self);
+        // tracing::info!("[{:?}] Received message: {:?}", state.state, self);
 
         match self {
             Msg::Toggle => {

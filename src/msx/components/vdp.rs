@@ -14,6 +14,14 @@ pub struct Sprite {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum DisplayMode {
+    Text1,
+    Multicolor,
+    Graphic1,
+    Graphic2,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TMS9918 {
     #[serde(with = "BigArray")]
     pub vram: [u8; 0x4000],
@@ -28,6 +36,7 @@ pub struct TMS9918 {
     pub frame: u8,
     pub line: u8,
     pub vblank: bool,
+    pub display_mode: DisplayMode,
 }
 
 impl Default for TMS9918 {
@@ -50,6 +59,7 @@ impl Default for TMS9918 {
             frame: 0,
             line: 0,
             vblank: false,
+            display_mode: DisplayMode::Text1,
         }
     }
 }
@@ -120,20 +130,20 @@ impl TMS9918 {
                 self.address, data, data as char
             );
         }
-        if self.address < 0x4000 {
-            self.vram[self.address as usize] = data;
-            self.data_pre_read = data;
-        } else {
-            // error!(
-            //     "[VDP] Attempted to write to VRAM at address {:04X} = 0x{:02X} {}",
-            //     self.address, data, data as char
-            // );
-        }
-        self.address = self.address.wrapping_add(1);
-        trace!(
-            "[VDP] Address after increment: 0x{:04X}, removing latched data...",
-            self.address
-        );
+        // if self.address < 0x4000 {
+        self.vram[self.address as usize] = data;
+        self.data_pre_read = data;
+        // } else {
+        // error!(
+        //     "[VDP] Attempted to write to VRAM at address {:04X} = 0x{:02X} {}",
+        //     self.address, data, data as char
+        // );
+        // }
+        self.address = (self.address + 1) & 0x3FFF;
+        // trace!(
+        //     "[VDP] Address after increment: 0x{:04X}, removing latched data...",
+        //     self.address
+        // );
 
         self.first_write = None;
         trace!("");
@@ -155,6 +165,126 @@ impl TMS9918 {
         res
     }
 
+    fn update_mode(&mut self) {
+        // Get the Mx bits from registers R#0 and R#1
+        let mx_bits = ((self.registers[0] & 0x0E) >> 1) | ((self.registers[1] & 0x18) << 2);
+
+        // Determine the display mode based on the Mx bits
+        self.display_mode = match mx_bits {
+            0x00 => DisplayMode::Graphic1,
+            0x01 => DisplayMode::Graphic2,
+            0x08 => DisplayMode::Text1,
+            0x10 => DisplayMode::Multicolor,
+            _ => {
+                tracing::warn!("[VDP] Unsupported display mode: {:04b}", mx_bits);
+                DisplayMode::Text1 // Default to Text 1 for unsupported modes
+            }
+        };
+
+        tracing::info!(
+            "[VDP] Display mode is now: {:?} ({:04b})",
+            self.display_mode,
+            mx_bits
+        );
+        // Update the VDP's state based on the new display mode
+        // (e.g., update the layout, pattern, or color tables, or change the rendering method)
+    }
+
+    fn write_register(&mut self, data: u8, latched_value: u8) {
+        // Set register
+        info!("[VDP] Set register: {:02X}", data);
+        let reg = data & 0x07;
+        info!("[VDP] Register is: {:08b}", reg);
+        let old_value = self.registers[reg as usize];
+        self.registers[reg as usize] = latched_value;
+        let modified = old_value ^ latched_value;
+        info!("[VDP] Current latched value: {:02X}", latched_value);
+
+        // Handle register-specific functionality
+        match reg {
+            0 | 1 => {
+                // Update mode, IRQ, sprites config, blinking, etc.
+                // Implement the functionality based on the WebMSX code
+                if modified & 0x10 != 0 {
+                    // IE1: Frame interrupt enable
+                    // TODO self.update_irq();
+                }
+                if modified & 0x0E != 0 {
+                    // Mx: Update display mode
+                    self.update_mode();
+                }
+                if reg == 1 {
+                    if modified & 0x20 != 0 {
+                        // IE0: Line interrupt enable
+                        // TODO self.update_irq();
+                    }
+                    if modified & 0x40 != 0 {
+                        // BL: Blanking
+                        // TODO self.update_blanking();
+                    }
+                    if modified & 0x18 != 0 {
+                        // Mx: Update display mode
+                        self.update_mode();
+                    }
+                    if modified & 0x04 != 0 {
+                        // CDR: Update blinking (Undocumented)
+                        // TODO self.update_blinking();
+                    }
+                    if modified & 0x03 != 0 {
+                        // SI, MAG: Update sprites config
+                        // TODO self.update_sprites_config();
+                    }
+                }
+            }
+            2 => {
+                // Update layout table address
+                // Implement the functionality based on the WebMSX code
+            }
+            3 | 10 => {
+                // Update color table address
+                // Implement the functionality based on the WebMSX code
+            }
+            4 => {
+                // Update pattern table address
+                // Implement the functionality based on the WebMSX code
+                // let cpt_base = (self.registers[4] as usize & 0x07) * 0x0800;
+                // self.cpt_base_address = cpt_base;
+            }
+            5 | 11 => {
+                // Update sprite attribute table address
+                // Implement the functionality based on the WebMSX code
+            }
+            6 => {
+                // Update sprite pattern table address
+                // Implement the functionality based on the WebMSX code
+            }
+            7 => {
+                // Update backdrop color
+                // Implement the functionality based on the WebMSX code
+            }
+            8 => {
+                // Update transparency and sprites config
+                // Implement the functionality based on the WebMSX code
+            }
+            9 => {
+                // Update signal metrics, render metrics, layout table address mask, and video standard
+                // Implement the functionality based on the WebMSX code
+            }
+            13 => {
+                // Update blinking
+                // Implement the functionality based on the WebMSX code
+            }
+            14 => {
+                // Update VRAM pointer
+                if modified & 0x07 != 0 {
+                    self.address = ((latched_value & 0x07) as u16) << 14 | (self.address & 0x3FFF);
+                    info!("[VDP] Setting VRAM pointer: {:04X}", self.address);
+                }
+            }
+            _ => {}
+        }
+    }
+
     fn write_99(&mut self, data: u8) {
         info!(
             "[VDP] Received 0x{:02X} ({}) at Port #99, handling...",
@@ -168,13 +298,15 @@ impl TMS9918 {
             );
             if data & 0x80 == 0 {
                 // Set register
-                info!("[VDP] Set register: {:02X}", data);
-                let reg = data & 0x07;
-                info!("[VDP] Register is: {:08b}", reg);
-                self.registers[reg as usize] = latched_value;
+                // info!("[VDP] Set register: {:02X}", data);
+                // let reg = data & 0x07;
+                // info!("[VDP] Register is: {:08b}", reg);
+                // self.registers[reg as usize] = latched_value;
+                self.write_register(data, latched_value);
                 info!("[VDP] Current latched value: {:02X}", latched_value);
                 // On V9918, the VRAM pointer high gets also written when writing to registers
-                self.address = (self.address & 0x00FF) | ((latched_value as u16 & 0x03F) << 8);
+                self.address =
+                    ((self.address & 0x00FF) | ((latched_value as u16 & 0x03F) << 8)) & 0x3FFF;
                 info!(
                     "[VDP] Also setting high part of the address to {:02X}. Address after: {:04X}",
                     latched_value, self.address
@@ -192,7 +324,8 @@ impl TMS9918 {
                 let lsb = latched_value as u16;
 
                 info!("[VDP] MSB: {:08b} LSB: {:08b}", msb, lsb);
-                self.address = self.address | msb | lsb;
+                // self.address = self.address | msb | lsb;
+                self.address = (self.address & 0x3C00) | (msb << 8) | lsb;
                 info!("[VDP] Address after MSB, MLB: {:04X}", self.address);
                 // Pre-read VRAM if "writemode = 0"
                 if (data & 0x40) == 0 {

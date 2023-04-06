@@ -422,6 +422,11 @@ impl Z80 {
                 self.pc = self.pc.wrapping_add(1);
                 self.c = self.b;
             }
+            0x49 => {
+                // LD C, C (does nothing)
+                self.pc = self.pc.wrapping_add(1);
+                trace!("LD C, C");
+            }
             0x4A => {
                 // LD C, D
                 self.pc = self.pc.wrapping_add(1);
@@ -1957,6 +1962,24 @@ impl Z80 {
                         // IM 1
                         self.im = 1;
                         self.pc = self.pc.wrapping_add(1);
+                    }
+                    0xA2 => {
+                        // INI
+                        let port = self.c;
+
+                        {
+                            let mut bus = self
+                                .bus
+                                .write()
+                                .expect("Couldn't obtain a write lock on the bus.");
+                            self.memory.write_byte(self.get_hl(), bus.input(port));
+                        }
+
+                        self.set_hl(self.get_hl().wrapping_add(1));
+                        self.b = self.b.wrapping_sub(1);
+
+                        self.pc = self.pc.wrapping_add(1);
+                        trace!("INI");
                     }
                     0xA3 => {
                         // OUTI

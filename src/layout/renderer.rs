@@ -35,12 +35,15 @@ impl<'a> Renderer<'a> {
         let pattern_area = self.vdp.pattern_table();
         let l = (line + self.vdp.get_vertical_scroll()) & 7;
 
+        // Calculate the base address of the PNT using register R#2
+        let pnt_base = (self.vdp.registers[2] as usize & 0x0F) * 0x0400;
+
         let name_start = (line / 8) * 40;
         let name_end = name_start + 40;
         let mut pixel_ptr = line * 256;
         for name in name_start..name_end {
             // FIXME why is the screen content at 0x0990 in our version?
-            let screen_offset = 0x0900 + name; // Calculate the proper offset in the VRAM
+            let screen_offset = pnt_base + name; // Calculate the proper offset in the VRAM
             let char_code = self.vdp.vram[screen_offset]; // Get the value directly from the VRAM array
             let pattern = pattern_area[l + char_code as usize * 8];
 
