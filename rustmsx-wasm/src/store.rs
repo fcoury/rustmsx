@@ -1,8 +1,9 @@
-use std::{rc::Rc, thread, time::Duration};
+use std::rc::Rc;
 
+use msx::Msx;
 use yewdux::{mrc::Mrc, prelude::*};
 
-use crate::{layout::Renderer, msx::Msx};
+use crate::layout::Renderer;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Msg {
@@ -10,7 +11,6 @@ pub enum Msg {
     Toggle,
     Step,
     Tick,
-    Render(Vec<u8>),
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
@@ -67,9 +67,9 @@ impl Reducer<ComputerState> for Msg {
             Msg::Step => {
                 state.msx.borrow_mut().step();
             }
-            Msg::Render(new_buffer) => {
-                state.screen_buffer = new_buffer;
-            }
+            // Msg::Render(new_buffer) => {
+            //     state.screen_buffer = new_buffer;
+            // }
             Msg::LoadRom(data) => {
                 if let Err(e) = state.msx.borrow_mut().load_rom(&data) {
                     state.error = Some(e.to_string());

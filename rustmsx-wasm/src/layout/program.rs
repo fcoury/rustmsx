@@ -1,6 +1,5 @@
+use msx::ProgramEntry;
 use yew::prelude::*;
-
-use crate::msx::ProgramEntry;
 
 #[derive(Properties, Clone, PartialEq)]
 pub struct Props {

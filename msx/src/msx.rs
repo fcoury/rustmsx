@@ -1,6 +1,5 @@
-pub mod components;
-
 use std::{
+    fmt,
     fs::File,
     io::Read,
     sync::{Arc, RwLock},
@@ -9,14 +8,23 @@ use std::{
 use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 
-use self::components::{instruction::Instruction, vdp::TMS9918};
-use crate::msx::components::{bus::Bus, cpu::Z80, memory::Memory};
+use crate::{bus::Bus, cpu::Z80, instruction::Instruction, memory::Memory, vdp::TMS9918};
 
-#[derive(Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ProgramEntry {
     pub address: u16,
     pub instruction: String,
     pub data: String,
+}
+
+impl fmt::Display for ProgramEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{:04X}  {:<10}  {}",
+            self.address, self.data, self.instruction
+        )
+    }
 }
 
 #[derive(Derivative, Serialize, Deserialize)]
@@ -117,6 +125,15 @@ impl Msx {
         Ok(())
     }
 
+    pub fn instruction(&self) -> ProgramEntry {
+        let instr = Instruction::parse(&self.cpu.memory, self.cpu.pc);
+        ProgramEntry {
+            address: self.cpu.pc,
+            instruction: instr.name(),
+            data: instr.opcode_with_args(),
+        }
+    }
+
     pub fn program(&self) -> Vec<ProgramEntry> {
         let mut program = Vec::new();
         let mut pc = self.cpu.pc;
@@ -191,5 +208,9 @@ impl Msx {
     pub fn step(&mut self) {
         self.cpu.execute_cycle();
         self.current_scanline = (self.current_scanline + 1) % 192;
+    }
+
+    pub fn halted(&self) -> bool {
+        self.cpu.halted
     }
 }

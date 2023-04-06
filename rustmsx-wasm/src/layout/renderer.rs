@@ -1,4 +1,4 @@
-use crate::msx::components::vdp::TMS9918;
+use msx::TMS9918;
 
 pub struct Renderer<'a> {
     vdp: &'a TMS9918,

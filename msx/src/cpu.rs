@@ -5,7 +5,7 @@ use std::{
 
 use derivative::Derivative;
 use serde::{Deserialize, Serialize};
-use tracing::{error, info, trace};
+use tracing::{info, trace};
 
 use super::{bus::Bus, memory::Memory};
 
@@ -103,6 +103,13 @@ impl fmt::Display for Z80 {
 }
 
 impl Z80 {
+    pub fn new_with_dependencies() -> (Self, Arc<RwLock<Bus>>, Memory) {
+        let bus = Arc::new(RwLock::new(Bus::default()));
+        let memory = Memory::new(bus.clone(), 64 * 1024);
+        let cpu = Z80::new(bus.clone(), memory.clone());
+        (cpu, bus, memory)
+    }
+
     pub fn new(bus: Arc<RwLock<Bus>>, memory: Memory) -> Self {
         Z80 {
             bus,
@@ -267,8 +274,13 @@ impl Z80 {
             }
             0xFF => {
                 // RST 20H
-                error!("RST 38H from PC=0x{:04X}", self.pc);
+                trace!("RST 38H from PC=0x{:04X}", self.pc);
                 self.rst(0x38);
+            }
+            0xF7 => {
+                // RST 30H
+                trace!("RST 30H");
+                self.rst(0x30);
             }
             0x3E => {
                 // LD A, n
@@ -711,11 +723,13 @@ impl Z80 {
                 // LD DE, A
                 trace!("LD (DE), A");
                 self.ld_de_a();
+                self.pc = self.pc.wrapping_add(1);
             }
             0x02 => {
                 // LD (BC), A
                 trace!("LD (BC), A");
                 self.ld_bc_a();
+                self.pc = self.pc.wrapping_add(1);
             }
             0x32 => {
                 // LD (nn), A
@@ -746,27 +760,27 @@ impl Z80 {
             0x3C => {
                 // INC A
                 trace!("INC A");
-                self.pc = self.pc.wrapping_add(1);
                 self.a = self.a.wrapping_add(1);
                 self.set_inc_flags(self.a);
+                self.pc = self.pc.wrapping_add(1);
             }
             0x04 => {
                 // INC B
-                self.pc = self.pc.wrapping_add(1);
                 self.b = self.b.wrapping_add(1);
                 self.set_inc_flags(self.b);
+                self.pc = self.pc.wrapping_add(1);
             }
             0x0C => {
                 // INC C
-                self.pc = self.pc.wrapping_add(1);
                 self.c = self.c.wrapping_add(1);
                 self.set_inc_flags(self.c);
+                self.pc = self.pc.wrapping_add(1);
             }
             0x14 => {
                 // INC D
-                self.pc = self.pc.wrapping_add(1);
                 self.d = self.d.wrapping_add(1);
                 self.set_inc_flags(self.d);
+                self.pc = self.pc.wrapping_add(1);
             }
             0x1C => {
                 // INC E
@@ -802,14 +816,14 @@ impl Z80 {
             }
             0x2C => {
                 // INC L
-                self.pc = self.pc.wrapping_add(1);
                 self.l = self.l.wrapping_add(1);
                 self.set_inc_flags(self.l);
+                self.pc = self.pc.wrapping_add(1);
             }
             0x34 => {
                 // INC (HL)
-                self.pc = self.pc.wrapping_add(1);
                 self.inc_hl();
+                self.pc = self.pc.wrapping_add(1);
             }
             0x3D => {
                 // DEC A
@@ -1228,6 +1242,19 @@ impl Z80 {
 
                 self.pc = self.pc.wrapping_add(1);
             }
+            0x17 => {
+                // RLA
+                trace!("RLA");
+                let msb = self.a & 0x80;
+                let carry = msb != 0;
+
+                self.a = (self.a << 1) | (self.get_flag(Flag::C) as u8);
+                self.set_flag(Flag::H, false);
+                self.set_flag(Flag::N, false);
+                self.set_flag(Flag::C, carry);
+
+                self.pc = self.pc.wrapping_add(1);
+            }
             0xB0 => {
                 // OR B
                 self.pc = self.pc.wrapping_add(1);
@@ -1445,12 +1472,22 @@ impl Z80 {
                 let opcode = self.memory.read_byte(self.pc);
                 match opcode {
                     0xBE => {
+                        // CP (IY+d)
                         self.pc = self.pc.wrapping_add(1);
                         let d = self.memory.read_byte(self.pc) as i8;
                         self.pc = self.pc.wrapping_add(1);
                         let value = self.memory.read_byte(self.get_iy_d(d as u8));
                         self.cp(value);
                         self.pc = self.pc.wrapping_add(1);
+                    }
+                    0x22 => {
+                        // LD (nn), IY
+                        let low_addr = self.memory.read_byte(self.pc);
+                        let high_addr = self.memory.read_byte(self.pc);
+                        let address = u16::from_le_bytes([low_addr, high_addr]);
+                        self.memory.write_word(address, self.iy);
+                        trace!("LD ({:04X}), IY", address);
+                        self.pc = self.pc.wrapping_add(3);
                     }
                     0x2A => {
                         // LD IX, (nn)
@@ -1460,6 +1497,20 @@ impl Z80 {
                         self.ix = self.memory.read_word(address);
                         trace!("LD IX, {:04X}", self.ix);
                         self.pc = self.pc.wrapping_add(3);
+                    }
+                    0x2D => {
+                        // DEC IYL
+                        let iyl = self.iy as u8;
+                        let result = iyl.wrapping_sub(1);
+
+                        self.set_flag(Flag::N, true);
+                        self.set_flag(Flag::H, (iyl & 0x0F) == 0x01);
+                        self.set_flag(Flag::Z, result == 0);
+                        self.set_flag(Flag::S, (result & 0x80) != 0);
+                        self.set_flag(Flag::P, iyl == 0x80);
+
+                        self.iy = (self.iy & 0xFF00) | (result as u16);
+                        self.pc = self.pc.wrapping_add(1);
                     }
                     0xE5 => {
                         // PUSH IY
@@ -1953,11 +2004,6 @@ impl Z80 {
                     self.a = bus.input(port);
                 }
 
-                error!(
-                    "PC = #{:04X} IN (#{:02X}), A=0x{:02X}",
-                    self.pc, port, self.a
-                );
-
                 self.pc = self.pc.wrapping_add(2);
             }
             0xD3 => {
@@ -1988,6 +2034,25 @@ impl Z80 {
 
                 match extended_opcode {
                     0xB0 => self.ldi(),
+                    0x42 => {
+                        // SBC HL, BC
+                        let hl = self.get_hl();
+                        let bc = self.get_bc();
+                        let carry = if self.get_flag(Flag::C) { 1 } else { 0 };
+
+                        let result = hl.wrapping_sub(bc).wrapping_sub(carry);
+                        self.set_hl(result);
+
+                        self.set_flag(Flag::S, result & 0x8000 != 0);
+                        self.set_flag(Flag::Z, result == 0);
+                        self.set_flag(Flag::H, (hl & 0xFFF) < (bc & 0xFFF) + carry);
+                        self.set_flag(Flag::P, (hl & 0x7FFF) < (bc & 0x7FFF) + carry);
+                        self.set_flag(Flag::N, true);
+                        self.set_flag(Flag::C, hl < bc + carry);
+
+                        self.pc = self.pc.wrapping_add(1);
+                        trace!("SBC HL, BC");
+                    }
                     0x56 => {
                         // IM 1
                         self.im = 1;

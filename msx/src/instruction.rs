@@ -27,7 +27,8 @@ impl Instruction {
             let mut name = name.to_string();
             let mut i = 1;
             while name.contains(&format!("${}", i)) {
-                let arg = self.memory.read_byte(self.pc + i as u16);
+                let pc = self.pc.wrapping_add(i);
+                let arg = self.memory.read_byte(pc);
                 name = name.replace(&format!("${}", i), &format!("{:02X}", arg));
                 i += 1;
             }
@@ -38,6 +39,10 @@ impl Instruction {
 
     pub fn len(&self) -> u8 {
         self.as_def().1
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     #[allow(unused)]
@@ -221,6 +226,7 @@ impl Instruction {
             0xE6 => ("AND #$1", 2),
             0xB7 => ("OR A", 1),
             0x07 => ("RLCA", 1),
+            0x17 => ("RCA", 1),
             0xB0 => ("OR B", 1),
             0xB1 => ("OR C", 1),
             0xB2 => ("OR D", 1),
@@ -267,7 +273,9 @@ impl Instruction {
                 let opcode = self.memory.read_byte(self.pc.wrapping_add(1));
                 match opcode {
                     0xBE => ("CP (IY+d)", 4),
-                    0x2A => ("LD IY, (nn)", 4),
+                    0x22 => ("LD ($2$1), IY", 4),
+                    0x2A => ("LD IY, ($2$1)", 4),
+                    0x2D => ("DEC IYL", 2),
                     0xE5 => ("PUSH IY", 2),
                     0xE1 => ("POP IY", 2),
                     _ => {
@@ -336,6 +344,7 @@ impl Instruction {
                 let extended_opcode = self.memory.read_byte(self.pc.wrapping_add(1));
                 match extended_opcode {
                     0xB0 => ("LDIR", 2),
+                    0x42 => ("SBC HL, BC", 2),
                     0x56 => ("IM 1", 2),
                     0xA2 => ("INI", 2),
                     0xA3 => ("OUTI", 2),

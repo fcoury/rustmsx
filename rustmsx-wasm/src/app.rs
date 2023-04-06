@@ -4,6 +4,7 @@ use gloo::timers::callback::Interval;
 use yew::prelude::*;
 use yewdux::prelude::*;
 
+#[allow(unused)]
 use crate::{
     layout::{Memory, Navbar, Program, Registers, Screen, Vdp},
     store::{self, ComputerState, ExecutionState},
@@ -34,7 +35,7 @@ impl Component for App {
         }
     }
 
-    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+    fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
             Msg::State(state) => {
                 self.state = state;
@@ -63,8 +64,8 @@ impl Component for App {
     fn view(&self, _ctx: &Context<Self>) -> Html {
         let msx = self.state.msx.borrow();
         let program = msx.program();
-        // let vram = msx.vram();
-        // let ram = msx.ram();
+        let vram = msx.vram();
+        let ram = msx.ram();
         let cpu = msx.cpu.clone();
 
         html! {
@@ -76,12 +77,12 @@ impl Component for App {
                         <div class="status">
                             <Registers cpu={msx.cpu.clone()} />
 
-                            <Screen />
+                            // <Screen />
 
-                            // <div class="split">
-                            //     <Memory data={ram} />
-                            //     <Vdp data={vram} />
-                            // </div>
+                            <div class="split">
+                                <Memory data={ram} />
+                                <Vdp data={vram} />
+                            </div>
                         </div>
                     </div>
                 </div>

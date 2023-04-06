@@ -85,6 +85,10 @@ impl Ppi {
             }
             0xAA => {
                 info!("[PPI] Writing '{:02X}' to PPI port 0xAA", value);
+                let mode = self.register_c ^ value;
+                if mode == 0 {
+                    return;
+                }
                 self.register_c = value;
                 // var bit = (val & 0x0e) >>> 1;
                 // if ((val & 0x01) === 0) registerC &= ~(1 << bit);
@@ -96,14 +100,19 @@ impl Ppi {
             }
             0xAB => {
                 info!("[PPI] Writing '{:02X}' to PPI port 0xAB (control)", value);
-                self.control = value & 0x7F;
-                let bit_number = (value >> 1) & 0x07;
-                let bit_status = value & 0x01;
-                if bit_status == 0 {
-                    self.register_c &= !(1 << bit_number);
+                let bit = (value & 0x0e) >> 1;
+                if (value & 0x01) == 0 {
+                    self.register_c &= !(1 << bit);
                 } else {
-                    self.register_c |= 1 << bit_number;
+                    self.register_c |= 1 << bit;
                 }
+
+                // match bit {
+                //     0..=3 => self.update_keyboard_config(),
+                //     5 | 7 => self.update_pulse_signal(),
+                //     6 => self.update_caps_led(),
+                //     _ => (),
+                // }
             }
             _ => (),
         }

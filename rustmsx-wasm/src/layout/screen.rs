@@ -11,6 +11,7 @@ pub enum Msg {
     State(Rc<ComputerState>),
 }
 
+#[allow(unused)]
 pub struct Screen {
     canvas_ref: NodeRef,
     state: Rc<ComputerState>,

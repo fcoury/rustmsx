@@ -1,6 +1,5 @@
+use msx::Z80;
 use yew::prelude::*;
-
-use crate::msx::components::cpu::Z80;
 
 #[derive(Properties, Clone, PartialEq)]
 pub struct Props {

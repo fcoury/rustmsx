@@ -2,7 +2,7 @@ use std::sync::{Arc, RwLock};
 
 use derivative::Derivative;
 use serde::{Deserialize, Serialize};
-use tracing::error;
+use tracing::warn;
 
 use super::bus::Bus;
 
@@ -78,12 +78,12 @@ impl Memory {
             0x0000..=0x3FFF => {
                 // Writing to BIOS is typically not allowed
                 self.data[address as usize] = value;
-                error!("Writing to BIOS is not allowed")
+                warn!("Writing to BIOS is not allowed")
             }
             0x4000..=0x7FFF => {
                 // Writing to BASIC is typically not allowed
                 self.data[address as usize] = value;
-                error!("Writing to BASIC is not allowed")
+                warn!("Writing to BASIC is not allowed")
             }
             0x8000..=0xBFFF => {
                 // panic!("Writing to cartidge, does nothing")
