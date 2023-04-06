@@ -9,10 +9,10 @@ fn test_zexall() -> anyhow::Result<()> {
         std::env::current_dir().unwrap().display()
     );
     msx.load_binary("tests/fixtures/zexall.com", 0x0000)?;
+    println!("Starting...");
 
     loop {
         let instruction = msx.instruction();
-        println!("{}", instruction);
         msx.step();
 
         if msx.halted() {
@@ -20,17 +20,17 @@ fn test_zexall() -> anyhow::Result<()> {
         }
     }
 
-    // assert_eq!(cpu.pc, 0x0000);
-    // assert_eq!(cpu.a, 0x00);
-    // assert_eq!(cpu.b, 0x00);
-    // assert_eq!(cpu.c, 0x00);
-    // assert_eq!(cpu.d, 0x00);
-    // assert_eq!(cpu.e, 0x00);
-    // assert_eq!(cpu.f, 0x00);
-    // assert_eq!(cpu.sp, 0x0000);
-    // assert_eq!(cpu.get_hl(), 0x0000);
-    // assert_eq!(cpu.get_af(), 0x0000);
-    // assert_eq!(cpu.get_bc(), 0x0000);
+    // // assert_eq!(cpu.pc, 0x0000);
+    // // assert_eq!(cpu.a, 0x00);
+    // // assert_eq!(cpu.b, 0x00);
+    // // assert_eq!(cpu.c, 0x00);
+    // // assert_eq!(cpu.d, 0x00);
+    // // assert_eq!(cpu.e, 0x00);
+    // // assert_eq!(cpu.f, 0x00);
+    // // assert_eq!(cpu.sp, 0x0000);
+    // // assert_eq!(cpu.get_hl(), 0x0000);
+    // // assert_eq!(cpu.get_af(), 0x0000);
+    // // assert_eq!(cpu.get_bc(), 0x0000);
 
     Ok(())
 }

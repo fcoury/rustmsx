@@ -294,6 +294,7 @@ impl Instruction {
             0xD9 => ("EXX", 1),
             0xCC => ("CALL Z, #$2$1", 3),
             0xDC => ("CALL C, #$2$1", 3),
+            0xFC => ("CALL M, #$2$1", 3),
             0xCD => ("CALL #$2$1", 3),
             0xC9 => ("RET", 1),
             0xC8 => ("RET Z", 1),

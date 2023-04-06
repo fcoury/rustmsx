@@ -512,10 +512,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "derivative",
- "dyn-clone",
- "eventbus",
- "gloo",
- "js-sys",
  "serde",
  "serde-big-array",
  "serde_json",
@@ -523,12 +519,6 @@ dependencies = [
  "time",
  "tracing",
  "tracing-subscriber",
- "tracing-wasm",
- "tracing-web",
- "wasm-bindgen",
- "web-sys",
- "yew",
- "yewdux",
 ]
 
 [[package]]

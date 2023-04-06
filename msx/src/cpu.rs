@@ -1605,6 +1605,22 @@ impl Z80 {
                     self.pc = self.pc.wrapping_add(3);
                 }
             }
+            0xFC => {
+                trace!("CALL M, {:04X}", self.pc);
+                // CALL M, nn
+                self.pc = self.pc.wrapping_add(1);
+                let low_addr = self.memory.read_byte(self.pc);
+                self.pc = self.pc.wrapping_add(1);
+                let high_addr = self.memory.read_byte(self.pc);
+                let address = u16::from_le_bytes([low_addr, high_addr]);
+
+                if self.get_flag(Flag::S) {
+                    self.push(self.pc.wrapping_add(1));
+                    self.pc = address;
+                } else {
+                    self.pc = self.pc.wrapping_add(1);
+                }
+            }
             0xCD => {
                 // CALL nn
 
