@@ -95,10 +95,17 @@ body {
   justify-content: space-evenly;
 }
 
+.screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+
 .split {
   flex: 1;
   display: flex;
-  overflow: auto;
+  overflow: hidden;
 }
 
 .opcode {
@@ -140,7 +147,9 @@ body {
 .memory,
 .vram {
   flex: 1;
-  margin: 20px;
+  overflow: auto;
+  padding: 20px;
+  position: relative;
 }
 
 .display {

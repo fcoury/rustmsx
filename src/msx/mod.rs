@@ -9,8 +9,8 @@ use std::{
 use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 
-use self::components::instruction::Instruction;
-use crate::msx::components::{bus::Bus, cpu::Z80, memory::Memory, sound::AY38910, vdp::TMS9918};
+use self::components::{instruction::Instruction, vdp::TMS9918};
+use crate::msx::components::{bus::Bus, cpu::Z80, memory::Memory};
 
 #[derive(Clone, PartialEq)]
 pub struct ProgramEntry {
@@ -20,11 +20,12 @@ pub struct ProgramEntry {
 }
 
 #[derive(Derivative, Serialize, Deserialize)]
-#[derivative(Clone, PartialEq)]
+#[derivative(Clone, Debug, PartialEq, Eq)]
 pub struct Msx {
+    #[serde(skip)]
+    #[derivative(PartialEq = "ignore")]
+    pub bus: Arc<RwLock<Bus>>,
     pub cpu: Z80,
-    pub vdp: TMS9918,
-    pub psg: AY38910,
 
     current_scanline: u16,
     running: bool,
@@ -37,15 +38,6 @@ pub struct Msx {
     pub track_flags: bool,
     pub previous_memory: Option<Vec<u8>>,
     pub memory_hash: u64,
-
-    // events subscriber
-    #[serde(skip)]
-    #[derivative(PartialEq = "ignore", Clone(clone_with = "always_none"))]
-    subscriber: Option<Box<dyn Fn(EventType) + 'static>>,
-}
-
-fn always_none<T>(_original: &Option<T>) -> Option<T> {
-    None
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -57,36 +49,46 @@ pub enum EventType {
     Cycle,
 }
 
-impl Msx {
-    pub fn new() -> Self {
+impl Default for Msx {
+    fn default() -> Self {
         println!("Initializing MSX...");
         let bus = Arc::new(RwLock::new(Bus::new()));
         let memory = Memory::new(bus.clone(), 64 * 1024);
-        let cpu = Z80::new(bus, memory);
+        let cpu = Z80::new(bus.clone(), memory);
 
         Self {
             cpu,
+            bus,
             current_scanline: 0,
             max_cycles: None,
             track_flags: false,
-            vdp: TMS9918::new(),
-            psg: AY38910::new(),
             open_msx: false,
             break_on_mismatch: false,
             breakpoints: Vec::new(),
             previous_memory: None,
             memory_hash: 0,
-            subscriber: None,
             running: false,
         }
     }
+}
 
-    pub fn subscribe(&mut self, subscriber: Box<dyn Fn(EventType)>) {
-        self.subscriber = Some(subscriber);
+impl Msx {
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    fn notify(&self, event: EventType) {
-        self.subscriber.as_ref().map_or((), |f| f(event.clone()));
+    pub fn get_vdp(&self) -> TMS9918 {
+        let bus = self.bus.read().unwrap();
+        bus.vdp.clone()
+    }
+
+    pub fn ram(&self) -> Vec<u8> {
+        self.cpu.memory.data.to_vec()
+    }
+
+    pub fn vram(&self) -> Vec<u8> {
+        let bus = self.bus.read().unwrap();
+        bus.vdp.vram.to_vec()
     }
 
     #[allow(unused)]
@@ -108,10 +110,9 @@ impl Msx {
         Ok(())
     }
 
-    pub fn load_rom(&mut self, rom: &[u8]) -> anyhow::Result<()> {
+    pub fn load_rom(&mut self, rom: &[u8]) -> std::io::Result<()> {
         self.reset();
         self.cpu.memory.load_bios(rom)?;
-        self.notify(EventType::RomLoaded);
 
         Ok(())
     }
@@ -144,8 +145,8 @@ impl Msx {
     #[allow(unused)]
     pub fn reset(&mut self) {
         self.cpu.reset();
-        self.vdp.reset();
-        self.psg.reset();
+        let mut bus = self.bus.write().unwrap();
+        bus.reset();
     }
 
     // pub fn run(&mut self) -> anyhow::Result<()> {

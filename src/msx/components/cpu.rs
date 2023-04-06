@@ -30,7 +30,7 @@ pub enum Flag {
 }
 
 #[derive(Derivative, Serialize, Deserialize)]
-#[derivative(Debug, Clone, PartialEq)]
+#[derivative(Default, Debug, Clone, PartialEq)]
 pub struct Z80 {
     #[derivative(PartialEq = "ignore")]
     #[serde(skip)]
@@ -203,7 +203,7 @@ impl Z80 {
         // Fetch and decode the next instruction
         let opcode = self.memory.read_byte(self.pc);
         // if opcode > 0x00 {
-        info!("PC: 0x{:04X} Opcode: 0x{:02X}", self.pc, opcode);
+        // info!("PC: 0x{:04X} Opcode: 0x{:02X}", self.pc, opcode);
         // }
         // trace!(
         //     "A: 0x{:02X} B: 0x{:02X} C: 0x{:02X} F: 0b{:b}",

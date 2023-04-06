@@ -1,33 +1,29 @@
 use yew::prelude::*;
+use yewdux::prelude::*;
 
-use crate::components::FileUploadButton;
-
-#[derive(Properties, Clone, PartialEq)]
-pub struct Props {
-    pub on_rom_upload: Callback<Vec<u8>>,
-    pub on_refresh: Callback<()>,
-    pub on_step: Callback<()>,
-    pub on_run: Callback<()>,
-}
+use crate::{
+    components::FileUploadButton,
+    store::{Msg, Store},
+};
 
 #[function_component]
-pub fn Navbar(props: &Props) -> Html {
-    let on_rom_upload = props.on_rom_upload.clone();
+pub fn Navbar() -> Html {
+    let (state, dispatch) = use_store::<Store>();
 
-    let on_refresh = props.on_refresh.clone();
-    let handle_refresh = Callback::from(move |_| {
-        on_refresh.emit(());
-    });
+    let d = dispatch.clone();
+    let on_rom_upload = Callback::from(move |rom: Vec<u8>| d.apply(Msg::LoadRom(rom)));
 
-    let props = props.clone();
-    let handle_step_click = Callback::from(move |_| {
-        props.on_step.emit(());
-    });
+    let d = dispatch.clone();
+    let handle_step_click = Callback::from(move |_| d.apply(Msg::Step));
 
-    // let props = props.clone();
-    let handle_run_click = Callback::from(move |_| {
-        props.on_run.emit(());
-    });
+    let d = dispatch;
+    let handle_run_click = Callback::from(move |_| d.apply(Msg::Toggle));
+
+    let label = match state.state {
+        crate::store::ComputerState::Off => "Run",
+        crate::store::ComputerState::Started => "Pause",
+        crate::store::ComputerState::Paused => "Run",
+    };
 
     html! {
         <div class="navbar">
@@ -35,13 +31,13 @@ pub fn Navbar(props: &Props) -> Html {
                 <FileUploadButton on_upload={on_rom_upload}>{ "Open ROM" }</FileUploadButton>
             </div>
             <div class="navbar__item">
-                <button onclick={handle_refresh}>{ "Refresh" }</button>
+                <button>{ "Refresh" }</button>
             </div>
             <div class="navbar__item">
                 <button onclick={handle_step_click}>{ "Step" }</button>
             </div>
             <div class="navbar__item">
-                <button onclick={handle_run_click}>{ "Run" }</button>
+                <button onclick={handle_run_click}>{ label }</button>
             </div>
         </div>
     }

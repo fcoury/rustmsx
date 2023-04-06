@@ -8,9 +8,9 @@ pub struct Bus {
     slot_count: u8,
 
     // I/O Devices
-    vdp: TMS9918,
-    psg: AY38910,
-    ppi: Ppi,
+    pub vdp: TMS9918,
+    pub psg: AY38910,
+    pub ppi: Ppi,
 
     vdp_io_clock: u8,
     primary_slot_config: u8,
@@ -36,6 +36,12 @@ impl Default for Bus {
 impl Bus {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn reset(&mut self) {
+        self.vdp.reset();
+        self.psg.reset();
+        self.ppi.reset();
     }
 
     pub fn input(&mut self, port: u8) -> u8 {
