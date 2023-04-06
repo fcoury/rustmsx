@@ -215,7 +215,10 @@ impl Z80 {
 
         // Execute the instruction
         match opcode {
-            0x00 => self.nop(),
+            0x00 => {
+                // NOP
+                self.pc = self.pc.wrapping_add(1);
+            }
             0xCF => {
                 // RST 30H
                 match self.c {
@@ -706,8 +709,13 @@ impl Z80 {
             }
             0x12 => {
                 // LD DE, A
-                trace!("LD DE, A");
+                trace!("LD (DE), A");
                 self.ld_de_a();
+            }
+            0x02 => {
+                // LD (BC), A
+                trace!("LD (BC), A");
+                self.ld_bc_a();
             }
             0x32 => {
                 // LD (nn), A
@@ -1707,6 +1715,28 @@ impl Z80 {
                     trace!("JP P, 0x{:04X} (not taken)", addr);
                 }
             }
+            0xEA => {
+                // JP PE, nn
+                let addr = self.read_word(self.pc.wrapping_add(1));
+                if self.get_flag(Flag::P) {
+                    self.pc = addr;
+                    trace!("JP P, 0x{:04X}", addr);
+                } else {
+                    self.pc = self.pc.wrapping_add(3);
+                    trace!("JP P, 0x{:04X} (not taken)", addr);
+                }
+            }
+            0xE2 => {
+                // JP PO, nn
+                let addr = self.read_word(self.pc.wrapping_add(1));
+                if !self.get_flag(Flag::P) {
+                    self.pc = addr;
+                    trace!("JP P, 0x{:04X}", addr);
+                } else {
+                    self.pc = self.pc.wrapping_add(3);
+                    trace!("JP P, 0x{:04X} (not taken)", addr);
+                }
+            }
 
             0xC2 | 0xC3 | 0xCA | 0xD2 | 0xDA | 0xFA => {
                 // JP cc, nn
@@ -2265,10 +2295,6 @@ impl Z80 {
         }
     }
 
-    fn nop(&mut self) {
-        // NOP does nothing, so this function is empty
-    }
-
     pub fn get_af(&self) -> u16 {
         u16::from(self.a) << 8 | u16::from(self.f)
     }
@@ -2368,6 +2394,11 @@ impl Z80 {
 
     fn ld_de_a(&mut self) {
         let address = self.get_de();
+        self.memory.write_byte(address, self.a);
+    }
+
+    fn ld_bc_a(&mut self) {
+        let address = self.get_bc();
         self.memory.write_byte(address, self.a);
     }
 
