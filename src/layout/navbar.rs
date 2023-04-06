@@ -3,12 +3,12 @@ use yewdux::prelude::*;
 
 use crate::{
     components::FileUploadButton,
-    store::{Msg, Store},
+    store::{ComputerState, Msg},
 };
 
 #[function_component]
 pub fn Navbar() -> Html {
-    let (state, dispatch) = use_store::<Store>();
+    let (state, dispatch) = use_store::<ComputerState>();
 
     let d = dispatch.clone();
     let on_rom_upload = Callback::from(move |rom: Vec<u8>| d.apply(Msg::LoadRom(rom)));
@@ -20,9 +20,9 @@ pub fn Navbar() -> Html {
     let handle_run_click = Callback::from(move |_| d.apply(Msg::Toggle));
 
     let label = match state.state {
-        crate::store::ComputerState::Off => "Run",
-        crate::store::ComputerState::Started => "Pause",
-        crate::store::ComputerState::Paused => "Run",
+        crate::store::ExecutionState::Off => "Run",
+        crate::store::ExecutionState::Running => "Pause",
+        crate::store::ExecutionState::Paused => "Run",
     };
 
     html! {
