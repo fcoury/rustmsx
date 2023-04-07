@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{num::ParseIntError, path::PathBuf};
 
 use anyhow::{anyhow, bail};
 use msx::Msx;
@@ -27,6 +27,8 @@ enum SetTarget {
     A,
     B,
     C,
+    HL,
+    HLAddress,
 }
 
 enum Command {
@@ -35,6 +37,7 @@ enum Command {
     Continue,
     Reset,
     Dump,
+    List,
     Send(Vec<String>),
     AddBreakpoint(u16),
     RemoveBreakpoint(u16),
@@ -57,11 +60,14 @@ impl CommandLine {
             Some("step") | Some("n") => Command::Step,
             Some("cont") | Some("c") => Command::Continue,
             Some("reset") => Command::Reset,
+            Some("list") | Some("l") => Command::List,
             Some("set") | Some("s") => {
                 let target = match parts.next() {
                     Some("a") => SetTarget::A,
                     Some("b") => SetTarget::B,
                     Some("c") => SetTarget::C,
+                    Some("hl") => SetTarget::HL,
+                    Some("(hl)") => SetTarget::HLAddress,
                     _ => panic!("Invalid set target"),
                 };
 
@@ -90,7 +96,7 @@ impl CommandLine {
             Some("send") => {
                 let mut args = Vec::new();
 
-                while let Some(arg) = parts.next() {
+                for arg in parts.by_ref() {
                     args.push(arg.to_string());
                 }
 
@@ -194,6 +200,19 @@ impl Runner {
         Ok(())
     }
 
+    pub fn list(&mut self) -> anyhow::Result<()> {
+        let program = self.msx.program_slice(10, 20);
+        for line in program {
+            let flag = if self.msx.pc() == line.address {
+                ">"
+            } else {
+                " "
+            };
+            println!("{} {}", flag, line);
+        }
+        Ok(())
+    }
+
     pub fn start_prompt(&mut self) -> anyhow::Result<()> {
         let history_file = PathBuf::new()
             .join(dirs::home_dir().unwrap())
@@ -244,6 +263,10 @@ impl Runner {
                 self.dump()?;
                 Ok(true)
             }
+            Command::List => {
+                self.list()?;
+                Ok(true)
+            }
             Command::MemSet(addr, value) => {
                 self.msx.set_memory(addr, value);
                 Ok(true)
@@ -257,13 +280,14 @@ impl Runner {
                 let value = line
                     .args
                     .get(0)
-                    .ok_or_else(|| anyhow!("Missing value"))?
-                    .parse::<u8>()?;
+                    .ok_or_else(|| anyhow!("Missing set value"))?;
 
                 match target {
-                    SetTarget::A => self.msx.set_a(value),
-                    SetTarget::B => self.msx.set_b(value),
-                    SetTarget::C => self.msx.set_c(value),
+                    SetTarget::A => self.msx.set_a(parse_as_u8(value)?),
+                    SetTarget::B => self.msx.set_b(parse_as_u8(value)?),
+                    SetTarget::C => self.msx.set_c(parse_as_u8(value)?),
+                    SetTarget::HL => self.msx.set_hl(parse_as_u16(value)?),
+                    SetTarget::HLAddress => self.msx.set_hl_address(parse_as_u16(value)?),
                 }
 
                 Ok(true)
@@ -287,6 +311,26 @@ impl Runner {
                 Ok(true)
             }
         }
+    }
+}
+
+fn parse_as_u8(s: &str) -> Result<u8, ParseIntError> {
+    if let Some(end) = s.strip_prefix("0x") {
+        u8::from_str_radix(end, 16)
+    } else if s.starts_with('$') || s.starts_with('#') {
+        u8::from_str_radix(&s[1..], 16)
+    } else {
+        s.parse()
+    }
+}
+
+fn parse_as_u16(s: &str) -> Result<u16, ParseIntError> {
+    if let Some(end) = s.strip_prefix("0x") {
+        u16::from_str_radix(end, 16)
+    } else if s.starts_with('$') || s.starts_with('#') {
+        u16::from_str_radix(&s[1..], 16)
+    } else {
+        s.parse()
     }
 }
 

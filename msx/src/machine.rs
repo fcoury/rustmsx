@@ -110,6 +110,14 @@ impl Msx {
         self.cpu.c = value;
     }
 
+    pub fn set_hl(&mut self, value: u16) {
+        self.cpu.set_hl(value);
+    }
+
+    pub fn set_hl_address(&mut self, value: u16) {
+        self.cpu.memory.write_word(self.cpu.get_hl(), value);
+    }
+
     pub fn set_memory(&mut self, address: u16, value: u8) {
         self.cpu.memory.write_byte(address, value);
     }
@@ -147,6 +155,25 @@ impl Msx {
             instruction: instr.name(),
             data: instr.opcode_with_args(),
         }
+    }
+
+    pub fn program_slice(&self, before_pc: u16, size: u16) -> Vec<ProgramEntry> {
+        let mut program = Vec::new();
+
+        let pc = self.cpu.pc;
+        let program_start = pc.saturating_sub(before_pc);
+        let program_end = program_start + size;
+
+        for pc in program_start..program_end {
+            let instr = Instruction::parse(&self.cpu.memory, pc);
+            program.push(ProgramEntry {
+                address: pc,
+                instruction: instr.name().to_string(),
+                data: instr.opcode_with_args(),
+            });
+        }
+
+        program
     }
 
     pub fn program(&self) -> Vec<ProgramEntry> {
