@@ -3,6 +3,7 @@ use std::{num::ParseIntError, path::PathBuf};
 use anyhow::{anyhow, bail};
 use msx::Msx;
 use rustyline::DefaultEditor;
+use similar::{ChangeTag, TextDiff};
 
 use crate::{
     internal_state::{InternalState, ReportState},
@@ -31,9 +32,10 @@ enum SetTarget {
     HLAddress,
 }
 
-enum CmdTarget {
+enum DumpTarget {
     Msx,
     OpenMsx,
+    Diff,
 }
 
 enum Command {
@@ -68,7 +70,7 @@ enum Command {
     MemSet(u16, u8),
 
     /// dumps the contents of the memory
-    MemDump(CmdTarget),
+    MemDump(DumpTarget),
 
     /// sets the value of a register
     Set(SetTarget),
@@ -135,8 +137,9 @@ impl CommandLine {
             }
             Some("memdump") | Some("md") => {
                 let target = match parts.next() {
-                    Some("openmsx") => CmdTarget::OpenMsx,
-                    None | Some("msx") => CmdTarget::Msx,
+                    None | Some("diff") => DumpTarget::Diff,
+                    Some("openmsx") => DumpTarget::OpenMsx,
+                    Some("msx") => DumpTarget::Msx,
                     _ => bail!(
                         "Invalid target for memdump. Use openmsx, msx or leave it empty for msx."
                     ),
@@ -362,27 +365,49 @@ impl Runner {
 
                 Ok(true)
             }
-            Command::MemDump(_target) => {
+            Command::MemDump(target) => {
                 let start = 0u16;
-                let end = start + (self.msx.mem_size() - 1) as u16;
+                let end = (self.msx.mem_size() - 1) as u16;
 
-                println!("Memory dump from {:#06X} to {:#06X}", start, end);
-
-                let mut addr = start;
-                'main: while addr <= end {
-                    let mut line = format!("{:04X}: ", addr);
-                    let mut chars = String::new();
-                    for _ in 0..=16 {
-                        line.push_str(&format!("{:02X} ", self.msx.get_memory(addr)));
-                        let c = self.msx.get_memory(addr) as char;
-                        chars.push(if c.is_ascii_graphic() { c } else { '.' });
-                        if addr >= end {
-                            break 'main;
-                        }
-                        addr += 1;
+                match target {
+                    DumpTarget::Msx => {
+                        println!("Memory dump from {:#06X} to {:#06X}", start, end);
+                        println!("{}", self.msx.memory_dump(start, end));
                     }
-                    println!("{:>54} {}", line, chars);
+                    DumpTarget::OpenMsx => {
+                        if let Some(client) = &mut self.client {
+                            println!("Memory dump from {:#06X} to {:#06X}", start, end);
+                            println!("{}", client.memory_dump(start, end)?);
+                        }
+                    }
+                    DumpTarget::Diff => {
+                        if let Some(client) = &mut self.client {
+                            let msx_dump = self.msx.memory_dump(start, end);
+                            let openmsx_dump = client.memory_dump(start, end)?;
+                            let diff = TextDiff::from_lines(&msx_dump, &openmsx_dump);
+
+                            if !diff.iter_all_changes().any(|c| c.tag() != ChangeTag::Equal) {
+                                println!("No differences.");
+                                return Ok(true);
+                            }
+
+                            for change in diff.iter_all_changes() {
+                                if change.tag() == ChangeTag::Equal {
+                                    continue;
+                                }
+                                let sign = match change.tag() {
+                                    ChangeTag::Delete => "-",
+                                    ChangeTag::Insert => "+",
+                                    ChangeTag::Equal => " ",
+                                };
+                                print!("{}{}", sign, change);
+                            }
+                        } else {
+                            eprintln!("Can't diff memory: no openMSX connection.");
+                        }
+                    }
                 }
+                println!();
 
                 Ok(true)
             }

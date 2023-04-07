@@ -1100,6 +1100,7 @@ dependencies = [
  "rustyline",
  "serde",
  "sha1",
+ "similar",
  "tinytemplate",
  "tracing",
  "tracing-subscriber",
@@ -1265,6 +1266,12 @@ checksum = "900fba806f70c630b0a382d0d825e17a0f19fcd059a2ade1ff237bcddf446b31"
 dependencies = [
  "lazy_static",
 ]
+
+[[package]]
+name = "similar"
+version = "2.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "420acb44afdae038210c99e69aae24109f32f15500aa708e81d46c9f29d55fcf"
 
 [[package]]
 name = "slab"

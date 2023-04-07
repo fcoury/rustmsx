@@ -169,6 +169,11 @@ impl Client {
         Ok(())
     }
 
+    pub fn memory_dump(&mut self, start: u16, end: u16) -> anyhow::Result<String> {
+        let res = self.send(&format!("showmem {} {}", start, end))?;
+        Ok(res)
+    }
+
     pub fn shutdown(&mut self) -> Result<()> {
         self.send("set power off")?;
         Ok(())

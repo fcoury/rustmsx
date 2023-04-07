@@ -26,3 +26,4 @@ sha1 = "0.10.5"
 serde = { version = "1.0.159", features = ["derive"] }
 path-absolutize = "3.0.14"
 rustyline = "11.0.0"
+similar = "2.2.1"
