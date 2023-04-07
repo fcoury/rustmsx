@@ -2,6 +2,8 @@ use std::path::PathBuf;
 
 use msx::Msx;
 
+use crate::internal_state::{InternalState, ReportState};
+
 #[derive(Debug, Default, Clone)]
 pub struct Runner {
     pub rom: PathBuf,
@@ -105,5 +107,26 @@ impl RunnerBuilder {
             track_flags: self.track_flags,
             running: false,
         }
+    }
+}
+
+impl ReportState for Msx {
+    fn report_state(&mut self) -> anyhow::Result<InternalState> {
+        let cpu = &self.cpu;
+        Ok(InternalState {
+            a: cpu.a,
+            f: cpu.f,
+            b: cpu.b,
+            c: cpu.c,
+            d: cpu.d,
+            e: cpu.e,
+            h: cpu.h,
+            l: cpu.l,
+            sp: cpu.sp,
+            pc: cpu.pc,
+            hl: cpu.get_hl(),
+            hl_contents: cpu.read_byte(cpu.get_hl()),
+            opcode: cpu.read_byte(cpu.pc),
+        })
     }
 }
