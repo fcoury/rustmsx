@@ -78,7 +78,10 @@ impl Memory {
             0x0000..=0x3FFF => {
                 // Writing to BIOS is typically not allowed
                 self.data[address as usize] = value;
-                warn!("Writing to BIOS is not allowed")
+                warn!(
+                    "Writing to BIOS is not allowed - ${:04X} = ${:02X}",
+                    address, value
+                );
             }
             0x4000..=0x7FFF => {
                 // Writing to BASIC is typically not allowed

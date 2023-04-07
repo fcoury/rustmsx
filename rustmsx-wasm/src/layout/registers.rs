@@ -1,9 +1,10 @@
-use msx::Z80;
+use msx::{TMS9918, Z80};
 use yew::prelude::*;
 
 #[derive(Properties, Clone, PartialEq)]
 pub struct Props {
     pub cpu: Z80,
+    pub vdp: TMS9918,
 }
 
 #[function_component]
@@ -54,6 +55,18 @@ pub fn Registers(props: &Props) -> Html {
             <div class="register">
                 <div class="register__name">{ "BC" }</div>
                 <div class="register__value">{ format!("{:04X}", cpu.get_bc() ) }</div>
+            </div>
+            <div class="register">
+                <div class="register__name">{ "VDP0" }</div>
+                <div class="register__value">{ format!("{:08b}", props.vdp.registers[0] ) }</div>
+            </div>
+            <div class="register">
+                <div class="register__name">{ "VDP1" }</div>
+                <div class="register__value">{ format!("{:08b}", props.vdp.registers[1] ) }</div>
+            </div>
+            <div class="register">
+                <div class="register__name">{ "VDP2" }</div>
+                <div class="register__value">{ format!("{:08b}", props.vdp.registers[2] ) }</div>
             </div>
         </div>
     }

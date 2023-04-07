@@ -44,7 +44,9 @@ impl Component for Screen {
 
     fn view(&self, _ctx: &Context<Self>) -> Html {
         html! {
-            <canvas ref={&self.canvas_ref} width="256" height="192"></canvas>
+            <div class="screen">
+                <canvas id="screen" ref={&self.canvas_ref} width="256" height="192"></canvas>
+            </div>
         }
     }
 }

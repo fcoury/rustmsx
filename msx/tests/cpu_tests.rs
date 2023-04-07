@@ -12,7 +12,7 @@ fn test_zexall() -> anyhow::Result<()> {
     println!("Starting...");
 
     loop {
-        let instruction = msx.instruction();
+        // let instruction = msx.instruction();
         msx.step();
 
         if msx.halted() {

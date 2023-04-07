@@ -4,7 +4,6 @@ use gloo::timers::callback::Interval;
 use yew::prelude::*;
 use yewdux::prelude::*;
 
-#[allow(unused)]
 use crate::{
     layout::{Memory, Navbar, Program, Registers, Screen, Vdp},
     store::{self, ComputerState, ExecutionState},
@@ -67,6 +66,7 @@ impl Component for App {
         let vram = msx.vram();
         let ram = msx.ram();
         let cpu = msx.cpu.clone();
+        let vdp = msx.vdp();
 
         html! {
             <div id="root">
@@ -75,9 +75,9 @@ impl Component for App {
                     <div class="main">
                         <Program data={program} pc={cpu.pc} />
                         <div class="status">
-                            <Registers cpu={msx.cpu.clone()} />
+                            <Registers cpu={msx.cpu.clone()} vdp={vdp} />
 
-                            // <Screen />
+                            <Screen />
 
                             <div class="split">
                                 <Memory data={ram} />

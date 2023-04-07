@@ -166,6 +166,11 @@ impl Msx {
         bus.reset();
     }
 
+    pub fn vdp(&self) -> TMS9918 {
+        let bus = self.bus.read().unwrap();
+        bus.vdp.clone()
+    }
+
     // pub fn run(&mut self) -> anyhow::Result<()> {
     //     self.running = true;
     //     self.cpu.max_cycles = self.max_cycles;

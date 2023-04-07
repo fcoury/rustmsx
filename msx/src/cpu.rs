@@ -564,61 +564,61 @@ impl Z80 {
             }
             0x69 => {
                 // LD L, C
-                self.pc = self.pc.wrapping_add(1);
                 self.l = self.c;
+                self.pc = self.pc.wrapping_add(1);
             }
             0x6A => {
                 // LD L, D
-                self.pc = self.pc.wrapping_add(1);
                 self.l = self.d;
+                self.pc = self.pc.wrapping_add(1);
             }
             0x6B => {
                 // LD L, E
-                self.pc = self.pc.wrapping_add(1);
                 self.l = self.e;
+                self.pc = self.pc.wrapping_add(1);
             }
             0x6C => {
                 // LD L, H
-                self.pc = self.pc.wrapping_add(1);
                 self.l = self.h;
+                self.pc = self.pc.wrapping_add(1);
             }
             0x77 => {
                 // LD (HL), A
-                self.pc = self.pc.wrapping_add(1);
                 // trace!("LD (HL), A -> A before = 0x{:02X}", self.a);
                 self.ld_hl_a();
+                self.pc = self.pc.wrapping_add(1);
                 // trace!("           -> HL = 0x{:04X}", self.get_hl());
                 // trace!("           -> HL = 0x{:04X}", self.get_hl());
             }
             0x70 => {
                 // LD (HL), B
-                self.pc = self.pc.wrapping_add(1);
                 self.ld_hl_b();
+                self.pc = self.pc.wrapping_add(1);
             }
             0x71 => {
                 // LD (HL), C
-                self.pc = self.pc.wrapping_add(1);
                 self.ld_hl_c();
+                self.pc = self.pc.wrapping_add(1);
             }
             0x72 => {
                 // LD (HL), D
-                self.pc = self.pc.wrapping_add(1);
                 self.ld_hl_d();
+                self.pc = self.pc.wrapping_add(1);
             }
             0x73 => {
                 // LD (HL), E
-                self.pc = self.pc.wrapping_add(1);
                 self.ld_hl_e();
+                self.pc = self.pc.wrapping_add(1);
             }
             0x74 => {
                 // LD (HL), H
-                self.pc = self.pc.wrapping_add(1);
                 self.ld_hl_h();
+                self.pc = self.pc.wrapping_add(1);
             }
             0x75 => {
                 // LD (HL), L
-                self.pc = self.pc.wrapping_add(1);
                 self.ld_hl_l();
+                self.pc = self.pc.wrapping_add(1);
             }
             0x36 => {
                 // LD (HL), n
@@ -626,6 +626,7 @@ impl Z80 {
                 let hl_address = self.get_hl();
 
                 trace!("LD (HL), 0x{:02X}", value);
+                // info!("LD (HL), 0x{:02X} | PC = #{:04X}", value, self.pc);
 
                 self.memory.write_byte(hl_address, value);
                 self.pc = self.pc.wrapping_add(2);
@@ -735,6 +736,7 @@ impl Z80 {
                 // LD (nn), A
                 let address = self.read_word(self.pc.wrapping_add(1));
                 trace!("LD (0x{:04X}), A", address);
+                // info!("LD (0x{:04X}), A | PC = #{:04X}", self.a, self.pc);
                 self.memory.write_byte(address, self.a);
                 self.pc = self.pc.wrapping_add(3);
             }
@@ -1623,37 +1625,14 @@ impl Z80 {
             }
             0xCD => {
                 // CALL nn
-
-                // The current contents of the Program Counter (PC) are pushed onto the top of the external
-                // memory stack. The operands nn are then loaded to the PC to point to the address in memory at which the first op code of a subroutine is to be fetched. At the end of the subroutine,
-                // a RETurn instruction can be used to return to the original program flow by popping the top
-                // of the stack back to the PC. The push is accomplished by first decrementing the current
-                // contents of the Stack Pointer (register pair SP), loading the high-order byte of the PC contents to the memory address now pointed to by the SP; then decrementing SP again, and
-                // loading the low-order byte of the PC contents to the top of stack.
-                // Because this process is a 3-byte instruction, the Program Counter was incremented by
-                // three before the push is executed.
-
-                // self.pc = self.pc.wrapping_add(1);
-                // let address = self.read_word(self.pc);
-                // self.call(address);
-                // CALL nn
                 let low_byte = self.memory.read_byte(self.pc.wrapping_add(1));
                 let high_byte = self.memory.read_byte(self.pc.wrapping_add(2));
                 let target_address = u16::from_le_bytes([low_byte, high_byte]);
 
-                // Push the current PC+3 (return address) onto the stack
-                let return_address = self.pc.wrapping_add(3);
-                let return_address_high = ((return_address >> 8) & 0xFF) as u8;
-                let return_address_low = (return_address & 0xFF) as u8;
-
-                self.sp = self.sp.wrapping_sub(1);
-                self.memory.write_byte(self.sp, return_address_high);
-                self.sp = self.sp.wrapping_sub(1);
-                self.memory.write_byte(self.sp, return_address_low);
-
-                // Jump to the target subroutine address
-                self.pc = target_address;
                 info!("#{:04X} - CALL {:04X}", self.pc, target_address);
+
+                self.push(self.pc.wrapping_add(3));
+                self.pc = target_address;
             }
             0xC9 => {
                 // RET
@@ -2026,12 +2005,13 @@ impl Z80 {
                 // OUT (n), A
                 let port = self.read_byte(self.pc.wrapping_add(1));
                 let data = self.a;
-                trace!(
-                    "PC = #{:04X} OUT (#{:02X}), A=0x{:02X}",
-                    self.pc,
-                    port,
-                    data
-                );
+
+                if port >= 0x90 {
+                    info!(
+                        "PC = #{:04X} OUT (n), A | Port = #{:02X} | Data = 0x{:02X}",
+                        self.pc, port, data
+                    );
+                }
 
                 {
                     let mut bus = self
@@ -2083,6 +2063,7 @@ impl Z80 {
                                 .bus
                                 .write()
                                 .expect("Couldn't obtain a write lock on the bus.");
+                            // info!("0xA2 | PC = #{:04X}", self.pc);
                             self.memory.write_byte(self.get_hl(), bus.input(port));
                         }
 
@@ -2096,9 +2077,10 @@ impl Z80 {
                         // OUTI
                         let value = self.memory.read_byte(self.get_hl());
                         let port = self.c;
-                        if port >= 0x90 && value == 0x63 {
+
+                        if port >= 0x90 {
                             info!(
-                                "PC = #{:04X} OUT (#{:02X}) from HL 0x{:04X} = 0x{:02X}",
+                                "PC = #{:04X} OUTI | HL (0x{:04X}) | Port = #{:02X} | Data = 0x{:02X}",
                                 self.pc,
                                 self.get_hl(),
                                 port,
@@ -2124,6 +2106,14 @@ impl Z80 {
                         // OUT (C), D
                         let port = self.c;
                         let value = self.d;
+
+                        if port >= 0x90 {
+                            info!(
+                                "PC = #{:04X} OUT (C), D | Port = #{:02X} | Data = 0x{:02X}",
+                                self.pc, port, value
+                            );
+                        }
+
                         {
                             let mut bus = self
                                 .bus
@@ -2363,6 +2353,11 @@ impl Z80 {
     }
 
     fn set_register_by_index(&mut self, index: u8, value: u8) {
+        // info!(
+        //     "set_register_by_index | Val = {} | PC = #{:04X}",
+        //     value, self.pc
+        // );
+
         match index {
             0 => self.b = value,
             1 => self.c = value,
@@ -2439,46 +2434,59 @@ impl Z80 {
 
     fn ld_hl_a(&mut self) {
         let address = self.get_hl();
+        // FIXME BIOS is being called from this instructions (0x2007 with value 0xF5, PC = 0x0242)
+        // info!(
+        //     "LD (HL), A | A=0x{:02X} -> (HL)=0x{:04X} | PC = #{:04X}",
+        //     self.a, address, self.pc
+        // );
         trace!("LD (HL), A: 0x{:02X} -> 0x{:04X}", self.a, address);
         self.memory.write_byte(address, self.a);
     }
 
     fn ld_hl_b(&mut self) {
+        // info!("LD (HL), B | PC = #{:04X}", self.pc);
         let address = self.get_hl();
         self.memory.write_byte(address, self.b);
     }
 
     fn ld_hl_c(&mut self) {
+        // info!("LD (HL), C | PC = #{:04X}", self.pc);
         let address = self.get_hl();
         self.memory.write_byte(address, self.c);
     }
 
     fn ld_hl_d(&mut self) {
+        // info!("LD (HL), C | PC = #{:04X}", self.pc);
         let address = self.get_hl();
         self.memory.write_byte(address, self.d);
     }
 
     fn ld_hl_e(&mut self) {
+        // info!("LD (HL), E | PC = #{:04X}", self.pc);
         let address = self.get_hl();
         self.memory.write_byte(address, self.h);
     }
 
     fn ld_hl_l(&mut self) {
+        // info!("LD (HL), L | PC = #{:04X}", self.pc);
         let address = self.get_hl();
         self.memory.write_byte(address, self.l);
     }
 
     fn ld_hl_h(&mut self) {
+        // info!("LD (HL), H | PC = #{:04X}", self.pc);
         let address = self.get_hl();
         self.memory.write_byte(address, self.h);
     }
 
     fn ld_de_a(&mut self) {
+        // info!("LD (DE), A | PC = #{:04X}", self.pc);
         let address = self.get_de();
         self.memory.write_byte(address, self.a);
     }
 
     fn ld_bc_a(&mut self) {
+        // info!("LD (BC), A | PC = #{:04X}", self.pc);
         let address = self.get_bc();
         self.memory.write_byte(address, self.a);
     }
@@ -2487,6 +2495,7 @@ impl Z80 {
         let src = self.get_hl();
         let dest = self.get_de();
         let value = self.memory.read_byte(src);
+        // info!("LDI | PC = #{:04X}", self.pc);
         self.memory.write_byte(dest, value);
 
         self.set_hl(src.wrapping_add(1));
@@ -2507,6 +2516,7 @@ impl Z80 {
 
         self.set_inc_flags(result);
 
+        // info!("INC HL | PC = #{:04X}", self.pc);
         self.memory.write_byte(hl, result);
     }
 
@@ -2517,6 +2527,7 @@ impl Z80 {
 
         self.set_dec_flags(result);
 
+        // info!("DEC HL | PC = #{:04X}", self.pc);
         self.memory.write_byte(hl, result);
     }
 
