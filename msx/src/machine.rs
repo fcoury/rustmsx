@@ -48,15 +48,6 @@ pub struct Msx {
     pub memory_hash: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub enum EventType {
-    RomLoaded,
-    Breakpoint,
-    Halt,
-    MemoryUpdate { address: u16, value: u8 },
-    Cycle,
-}
-
 impl Default for Msx {
     fn default() -> Self {
         println!("Initializing MSX...");
@@ -99,12 +90,19 @@ impl Msx {
         bus.vdp.vram.to_vec()
     }
 
+    pub fn pc(&self) -> u16 {
+        self.cpu.pc
+    }
+
+    pub fn halted(&self) -> bool {
+        self.cpu.halted
+    }
+
     #[allow(unused)]
     pub fn add_breakpoint(&mut self, address: u16) {
         self.breakpoints.push(address);
     }
 
-    #[allow(unused)]
     pub fn load_binary(&mut self, path: &str, load_address: u16) -> std::io::Result<()> {
         let mut file = File::open(path)?;
         let mut buffer = Vec::new();
@@ -171,51 +169,8 @@ impl Msx {
         bus.vdp.clone()
     }
 
-    // pub fn run(&mut self) -> anyhow::Result<()> {
-    //     self.running = true;
-    //     self.cpu.max_cycles = self.max_cycles;
-    //     self.cpu.track_flags = self.track_flags;
-
-    //     let mut stop_next = false;
-
-    //     loop {
-    //         self.cpu.execute_cycle();
-    //         self.notify(EventType::Cycle);
-
-    //         let mut stop = !self.running;
-
-    //         if self.breakpoints.contains(&self.cpu.pc) {
-    //             println!("Breakpoint hit at {:#06X}", self.cpu.pc);
-    //             stop = true;
-    //         }
-
-    //         if stop || stop_next {
-    //             if stop_next {
-    //                 println!("Stepped to {:#06X}", self.cpu.pc);
-    //             }
-    //             stop_next = false;
-    //         }
-
-    //         if self.cpu.halted {
-    //             break;
-    //         }
-
-    //         self.current_scanline = (self.current_scanline + 1) % 192;
-    //         if self.current_scanline == 0 {
-    //             // renderer.draw(0, 0, 256, 192);
-    //             // display.update_screen(&renderer.screen_buffer);
-    //         }
-    //     }
-
-    //     Ok(())
-    // }
-
     pub fn step(&mut self) {
         self.cpu.execute_cycle();
         self.current_scanline = (self.current_scanline + 1) % 192;
-    }
-
-    pub fn halted(&self) -> bool {
-        self.cpu.halted
     }
 }
