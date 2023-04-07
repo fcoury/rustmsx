@@ -1,4 +1,5 @@
 mod internal_state;
+mod mru;
 mod open_msx;
 mod runner;
 

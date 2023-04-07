@@ -1,16 +1,16 @@
 use std::{num::ParseIntError, path::PathBuf};
 
 use anyhow::{anyhow, bail};
-use msx::Msx;
+use msx::{Msx, ProgramEntry};
 use rustyline::DefaultEditor;
 use similar::{ChangeTag, TextDiff};
 
 use crate::{
     internal_state::{InternalState, ReportState},
+    mru::MRUList,
     open_msx::Client,
 };
 
-#[derive(Default)]
 pub struct Runner {
     pub rom: PathBuf,
     pub breakpoints: Vec<u16>,
@@ -20,7 +20,9 @@ pub struct Runner {
     pub track_flags: bool,
 
     running: bool,
+    cycles: u64,
     client: Option<Client>,
+    instructions: MRUList<ProgramEntry>,
     msx: Msx,
 }
 
@@ -56,6 +58,9 @@ enum Command {
 
     /// lists the current loaded program around the current program counter
     List,
+
+    /// lists the execution log
+    Log,
 
     /// adds a breakpoint address
     AddBreakpoint(u16),
@@ -147,6 +152,7 @@ impl CommandLine {
 
                 Command::MemDump(target)
             }
+            Some("log") => Command::Log,
             _ => bail!("Invalid command: {}", line),
         };
 
@@ -221,11 +227,14 @@ impl Runner {
     }
 
     pub fn step(&mut self) -> anyhow::Result<()> {
+        self.instructions.push(self.msx.instruction());
         self.msx.step();
 
         if let Some(client) = &mut self.client {
             client.step()?;
         }
+
+        self.cycles += 1;
 
         Ok(())
     }
@@ -256,6 +265,15 @@ impl Runner {
                 " "
             };
             println!("{} {}", flag, line);
+        }
+
+        println!();
+        Ok(())
+    }
+
+    pub fn log(&mut self) -> anyhow::Result<()> {
+        for instruction in self.instructions.iter() {
+            println!("{}", instruction);
         }
 
         println!();
@@ -320,6 +338,10 @@ impl Runner {
             }
             Command::List => {
                 self.list()?;
+                Ok(true)
+            }
+            Command::Log => {
+                self.log()?;
                 Ok(true)
             }
             Command::MemSet(addr, value) => {
@@ -492,6 +514,8 @@ impl RunnerBuilder {
             running: false,
             client: None,
             msx: Msx::new(),
+            cycles: 0,
+            instructions: MRUList::new(100),
         }
     }
 }
