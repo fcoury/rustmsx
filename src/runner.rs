@@ -1,13 +1,15 @@
 use std::path::PathBuf;
 
+use anyhow::{anyhow, bail};
 use msx::Msx;
+use rustyline::DefaultEditor;
 
 use crate::{
     internal_state::{InternalState, ReportState},
     open_msx::Client,
 };
 
-#[derive(Debug, Default, Clone)]
+#[derive(Default)]
 pub struct Runner {
     pub rom: PathBuf,
     pub breakpoints: Vec<u16>,
@@ -17,14 +19,98 @@ pub struct Runner {
     pub track_flags: bool,
 
     running: bool,
+    client: Option<Client>,
+    msx: Msx,
+}
+
+enum SetTarget {
+    A,
+    B,
+    C,
+}
+
+enum Command {
+    Quit,
+    Step,
+    Continue,
+    Reset,
+    Dump,
+    Send(Vec<String>),
+    AddBreakpoint(u16),
+    RemoveBreakpoint(u16),
+    MemGet(u16),
+    MemSet(u16, u8),
+    Set(SetTarget),
+}
+
+struct CommandLine {
+    command: Command,
+    args: Vec<String>,
+}
+
+impl CommandLine {
+    fn parse(line: &str) -> anyhow::Result<Self> {
+        let mut parts = line.split_whitespace();
+
+        let command = match parts.next() {
+            Some("quit") | Some("q") => Command::Quit,
+            Some("step") | Some("n") => Command::Step,
+            Some("cont") | Some("c") => Command::Continue,
+            Some("reset") => Command::Reset,
+            Some("set") | Some("s") => {
+                let target = match parts.next() {
+                    Some("a") => SetTarget::A,
+                    Some("b") => SetTarget::B,
+                    Some("c") => SetTarget::C,
+                    _ => panic!("Invalid set target"),
+                };
+
+                Command::Set(target)
+            }
+            Some("dump") | Some("d") => Command::Dump,
+            Some("mem") | Some("m") => {
+                let addr = u16::from_str_radix(parts.next().unwrap(), 16)?;
+
+                match parts.next() {
+                    Some(p) => {
+                        let value = u8::from_str_radix(p, 16)?;
+                        Command::MemSet(addr, value)
+                    }
+                    None => Command::MemGet(addr),
+                }
+            }
+            Some("break") | Some("bp") => {
+                let addr = u16::from_str_radix(parts.next().unwrap(), 16)?;
+                Command::AddBreakpoint(addr)
+            }
+            Some("removebreak") | Some("rbp") => {
+                let addr = u16::from_str_radix(parts.next().unwrap(), 16)?;
+                Command::RemoveBreakpoint(addr)
+            }
+            Some("send") => {
+                let mut args = Vec::new();
+
+                while let Some(arg) = parts.next() {
+                    args.push(arg.to_string());
+                }
+
+                Command::Send(args)
+            }
+            _ => bail!("Invalid command: {}", line),
+        };
+
+        let args = parts.map(|s| s.to_string()).collect();
+
+        Ok(Self { command, args })
+    }
 }
 
 impl Runner {
     pub fn run(&mut self) -> anyhow::Result<()> {
-        let mut msx = Msx::new();
-        msx.load_binary(self.rom.to_str().unwrap())?;
+        self.msx.load_binary(self.rom.to_str().unwrap())?;
 
-        let mut client = if self.open_msx {
+        self.client = if self.open_msx {
+            Client::start()?;
             let mut client = Client::new(self.rom.clone())?;
             client.init()?;
 
@@ -38,32 +124,169 @@ impl Runner {
         let mut stop_next = false;
 
         loop {
-            msx.step();
-
-            if let Some(client) = &mut client {
-                client.step()?;
-            }
+            self.step()?;
 
             let mut stop = !self.running;
 
-            if self.breakpoints.contains(&msx.pc()) {
-                println!("Breakpoint hit at {:#06X}", msx.pc());
+            if let Some(client) = &mut self.client {
+                if self.break_on_mismatch {
+                    let msx_state = format!("{}", self.msx.report_state()?);
+                    let open_msx_state = format!("{}", client.report_state()?);
+
+                    if msx_state != open_msx_state {
+                        println!("Mismatch at {:#06X}", self.msx.pc());
+                        println!("{}", msx_state);
+                        println!("{}", open_msx_state);
+                        stop = true;
+                    }
+                }
+            }
+
+            if self.at_breakpoint() {
+                println!("Breakpoint hit at {:#06X}", self.msx.pc());
                 stop = true;
             }
 
             if stop || stop_next {
                 if stop_next {
-                    println!("Stepped to {:#06X}", msx.pc());
+                    println!("Stepped to {:#06X}", self.msx.pc());
                 }
                 stop_next = false;
+
+                self.start_prompt()?;
             }
 
-            if msx.halted() {
+            if self.msx.halted() || !self.running {
                 break;
             }
         }
 
+        if let Some(client) = &mut self.client {
+            client.shutdown()?;
+        }
+
         Ok(())
+    }
+
+    pub fn step(&mut self) -> anyhow::Result<()> {
+        self.msx.step();
+
+        if let Some(client) = &mut self.client {
+            client.step()?;
+        }
+
+        Ok(())
+    }
+
+    pub fn at_breakpoint(&mut self) -> bool {
+        self.breakpoints.contains(&self.msx.pc())
+    }
+
+    pub fn dump(&mut self) -> anyhow::Result<()> {
+        let state = &self.msx.report_state()?;
+        println!("{}", state);
+
+        if let Some(client) = &mut self.client {
+            let state = client.report_state()?;
+            println!("{}", state);
+        }
+
+        Ok(())
+    }
+
+    pub fn start_prompt(&mut self) -> anyhow::Result<()> {
+        let history_file = PathBuf::new()
+            .join(dirs::home_dir().unwrap())
+            .join(".rustmsx_history");
+
+        let mut rl = DefaultEditor::new()?;
+        if rl.load_history(&history_file).is_err() {
+            println!("No previous history.");
+        }
+
+        loop {
+            let readline = rl.readline(format!("#{:04X}> ", self.msx.pc()).as_str());
+
+            if let Ok(command) = readline {
+                rl.add_history_entry(command.as_str())?;
+                if !self.handle_command(command.as_str())? {
+                    break;
+                }
+            }
+        }
+
+        rl.append_history(&history_file)?;
+
+        Ok(())
+    }
+
+    pub fn handle_command(&mut self, command: &str) -> anyhow::Result<bool> {
+        let line = CommandLine::parse(command)?;
+
+        match line.command {
+            Command::Quit => {
+                self.running = false;
+                Ok(false)
+            }
+            Command::Step => {
+                self.step()?;
+                Ok(true)
+            }
+            Command::Continue => {
+                self.running = true;
+                Ok(false)
+            }
+            Command::Reset => {
+                self.msx.reset();
+                Ok(true)
+            }
+            Command::Dump => {
+                self.dump()?;
+                Ok(true)
+            }
+            Command::MemSet(addr, value) => {
+                self.msx.set_memory(addr, value);
+                Ok(true)
+            }
+            Command::MemGet(addr) => {
+                let value = self.msx.get_memory(addr);
+                println!("{:#06X}: {:#04X}", addr, value);
+                Ok(true)
+            }
+            Command::Set(target) => {
+                let value = line
+                    .args
+                    .get(0)
+                    .ok_or_else(|| anyhow!("Missing value"))?
+                    .parse::<u8>()?;
+
+                match target {
+                    SetTarget::A => self.msx.set_a(value),
+                    SetTarget::B => self.msx.set_b(value),
+                    SetTarget::C => self.msx.set_c(value),
+                }
+
+                Ok(true)
+            }
+            Command::AddBreakpoint(addr) => {
+                self.breakpoints.push(addr);
+                Ok(true)
+            }
+            Command::RemoveBreakpoint(addr) => {
+                self.breakpoints.retain(|&a| a != addr);
+                Ok(true)
+            }
+            Command::Send(args) => {
+                if let Some(client) = &mut self.client {
+                    match client.send(&args.join(" ")) {
+                        Ok(_) => {}
+                        Err(e) => println!("Error: {}", e),
+                    }
+                }
+
+                Ok(true)
+            }
+        }
     }
 }
 
@@ -122,6 +345,8 @@ impl RunnerBuilder {
             break_on_mismatch: self.break_on_mismatch,
             track_flags: self.track_flags,
             running: false,
+            client: None,
+            msx: Msx::new(),
         }
     }
 }

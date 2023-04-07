@@ -50,7 +50,7 @@ impl Bus {
             0xA0 | 0xA1 => self.psg.read(port),
             0xA8 | 0xA9 | 0xAA | 0xAB => self.ppi.read(port),
             _ => {
-                error!("  *** [BUS] Invalid port {:02X} read", port);
+                error!("[BUS] Invalid port {:02X} read", port);
                 0xff
             }
         }
@@ -62,7 +62,7 @@ impl Bus {
             0xA0 | 0xA1 => self.psg.write(port, data),
             0xA8 | 0xA9 | 0xAA | 0xAB => self.ppi.write(port, data),
             _ => {
-                error!("  *** [BUS] Invalid port {:02X} write", port);
+                error!("[BUS] Invalid port {:02X} write", port);
             }
         };
     }

@@ -35,7 +35,7 @@ pub fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     let log_level = format!(
-        "msx_emulator={},info",
+        "msx_emulator={},msx::cpu=error,msx::vdp=error,msx::ppi=error,info",
         if cli.debug { "trace" } else { "info" }
     );
     let subscriber = FmtSubscriber::builder()

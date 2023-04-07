@@ -98,6 +98,26 @@ impl Msx {
         self.cpu.halted
     }
 
+    pub fn set_a(&mut self, value: u8) {
+        self.cpu.a = value;
+    }
+
+    pub fn set_b(&mut self, value: u8) {
+        self.cpu.b = value;
+    }
+
+    pub fn set_c(&mut self, value: u8) {
+        self.cpu.c = value;
+    }
+
+    pub fn set_memory(&mut self, address: u16, value: u8) {
+        self.cpu.memory.write_byte(address, value);
+    }
+
+    pub fn get_memory(&self, address: u16) -> u8 {
+        self.cpu.memory.read_byte(address)
+    }
+
     #[allow(unused)]
     pub fn add_breakpoint(&mut self, address: u16) {
         self.breakpoints.push(address);

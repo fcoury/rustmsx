@@ -2,9 +2,11 @@ use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
+use std::process::Command;
+use std::time::Instant;
 use std::{env, fs};
 
-use anyhow::{anyhow, Error, Result};
+use anyhow::{anyhow, bail, Error, Result};
 use path_absolutize::*;
 use serde::Serialize;
 use sha1::{Digest, Sha1};
@@ -79,6 +81,28 @@ impl Drop for Client {
 }
 
 impl Client {
+    pub fn start() -> Result<bool> {
+        let result = Command::new("/usr/bin/open")
+            .arg("-a")
+            .arg("openMSX.app")
+            .output();
+
+        if result.is_err() {
+            return Ok(false);
+        }
+
+        let start_time = Instant::now();
+        loop {
+            if start_time.elapsed().as_secs() > 5 {
+                bail!("openMSX took too long to start.");
+            }
+
+            if find_socket().is_ok() {
+                return Ok(true);
+            }
+        }
+    }
+
     pub fn new(rom_path: PathBuf) -> Result<Client, Error> {
         let machine_xml = PathBuf::new()
             .join(dirs::home_dir().unwrap())
@@ -139,8 +163,14 @@ impl Client {
     pub fn init(&mut self) -> Result<()> {
         self.send("set power off")?;
         self.send("machine RUNNER")?;
-        self.send("debug set_bp 0x0000")?;
+        self.send("debug set_bp 0x0001")?;
         self.send("set power on")?;
+        self.send("reset")?;
+        Ok(())
+    }
+
+    pub fn shutdown(&mut self) -> Result<()> {
+        self.send("set power off")?;
         Ok(())
     }
 
