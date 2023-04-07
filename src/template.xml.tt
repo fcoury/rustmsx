@@ -20,7 +20,7 @@
       <ROM id="Temporary Machine">
         <mem base="0x0000" size="0x8000" />
         <rom>
-          <sha1>{sha}</sha1>
+          <sha1>{sha1}</sha1>
           <filename>{rom}</filename>
         </rom>
       </ROM>

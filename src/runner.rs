@@ -2,7 +2,10 @@ use std::path::PathBuf;
 
 use msx::Msx;
 
-use crate::internal_state::{InternalState, ReportState};
+use crate::{
+    internal_state::{InternalState, ReportState},
+    open_msx::Client,
+};
 
 #[derive(Debug, Default, Clone)]
 pub struct Runner {
@@ -19,7 +22,16 @@ pub struct Runner {
 impl Runner {
     pub fn run(&mut self) -> anyhow::Result<()> {
         let mut msx = Msx::new();
-        msx.load_binary(self.rom.to_str().unwrap(), 0x0000)?;
+        msx.load_binary(self.rom.to_str().unwrap())?;
+
+        let mut client = if self.open_msx {
+            let mut client = Client::new(self.rom.clone())?;
+            client.init()?;
+
+            Some(client)
+        } else {
+            None
+        };
 
         self.running = true;
 
@@ -27,6 +39,10 @@ impl Runner {
 
         loop {
             msx.step();
+
+            if let Some(client) = &mut client {
+                client.step()?;
+            }
 
             let mut stop = !self.running;
 

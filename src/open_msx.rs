@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::{env, fs};
 
 use anyhow::{anyhow, Error, Result};
+use path_absolutize::*;
 use serde::Serialize;
 use sha1::{Digest, Sha1};
 use tinytemplate::TinyTemplate;
@@ -82,6 +83,7 @@ impl Client {
         let machine_xml = PathBuf::new()
             .join(dirs::home_dir().unwrap())
             .join(".openMsx")
+            .join("share")
             .join("machines")
             .join("RUNNER.xml");
 
@@ -98,7 +100,7 @@ impl Client {
         let mut hasher = Sha1::new();
         hasher.update(&buffer);
         let machine = Machine {
-            rom: rom_path.to_str().unwrap().to_string(),
+            rom: rom_path.absolutize().unwrap().to_str().unwrap().to_string(),
             sha1: format!("{:x}", hasher.finalize()),
         };
 
@@ -136,7 +138,7 @@ impl Client {
 
     pub fn init(&mut self) -> Result<()> {
         self.send("set power off")?;
-        self.send("machine C-BIOS_MSX1")?;
+        self.send("machine RUNNER")?;
         self.send("debug set_bp 0x0000")?;
         self.send("set power on")?;
         Ok(())

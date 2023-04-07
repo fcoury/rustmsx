@@ -8,7 +8,7 @@ fn test_zexall() -> anyhow::Result<()> {
         "Current path is: {}",
         std::env::current_dir().unwrap().display()
     );
-    msx.load_binary("tests/fixtures/zexall.com", 0x0000)?;
+    msx.load_binary("tests/fixtures/zexall.com")?;
     println!("Starting...");
 
     loop {
