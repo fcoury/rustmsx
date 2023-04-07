@@ -81,6 +81,10 @@ impl Msx {
         bus.vdp.clone()
     }
 
+    pub fn mem_size(&self) -> usize {
+        self.cpu.memory.size()
+    }
+
     pub fn ram(&self) -> Vec<u8> {
         self.cpu.memory.data.to_vec()
     }

@@ -31,19 +31,50 @@ enum SetTarget {
     HLAddress,
 }
 
+enum CmdTarget {
+    Msx,
+    OpenMsx,
+}
+
 enum Command {
+    /// quits the emulator
     Quit,
-    Step,
-    Continue,
+
+    /// resets the emulator at initial state after loading the ROM
     Reset,
+
+    /// steps one instruction on all emulators
+    Step,
+
+    /// continues execution on all emulators
+    Continue,
+
+    /// dumps the current state of all emulators
     Dump,
+
+    /// lists the current loaded program around the current program counter
     List,
-    Send(Vec<String>),
+
+    /// adds a breakpoint address
     AddBreakpoint(u16),
+
+    /// removes a breakpoint address
     RemoveBreakpoint(u16),
+
+    /// gets the value of a memory address
     MemGet(u16),
+
+    /// sets the value of a memory address
     MemSet(u16, u8),
+
+    /// dumps the contents of the memory
+    MemDump(CmdTarget),
+
+    /// sets the value of a register
     Set(SetTarget),
+
+    /// sends a command to openMSX
+    Send(Vec<String>),
 }
 
 struct CommandLine {
@@ -102,6 +133,17 @@ impl CommandLine {
 
                 Command::Send(args)
             }
+            Some("memdump") | Some("md") => {
+                let target = match parts.next() {
+                    Some("openmsx") => CmdTarget::OpenMsx,
+                    None | Some("msx") => CmdTarget::Msx,
+                    _ => bail!(
+                        "Invalid target for memdump. Use openmsx, msx or leave it empty for msx."
+                    ),
+                };
+
+                Command::MemDump(target)
+            }
             _ => bail!("Invalid command: {}", line),
         };
 
@@ -143,6 +185,7 @@ impl Runner {
                         println!("Mismatch at {:#06X}", self.msx.pc());
                         println!("{}", msx_state);
                         println!("{}", open_msx_state);
+                        println!();
                         stop = true;
                     }
                 }
@@ -197,6 +240,7 @@ impl Runner {
             println!("{}", state);
         }
 
+        println!();
         Ok(())
     }
 
@@ -210,6 +254,8 @@ impl Runner {
             };
             println!("{} {}", flag, line);
         }
+
+        println!();
         Ok(())
     }
 
@@ -240,7 +286,13 @@ impl Runner {
     }
 
     pub fn handle_command(&mut self, command: &str) -> anyhow::Result<bool> {
-        let line = CommandLine::parse(command)?;
+        let line = match CommandLine::parse(command) {
+            Ok(line) => line,
+            Err(e) => {
+                println!("{}\n", e);
+                return Ok(true);
+            }
+        };
 
         match line.command {
             Command::Quit => {
@@ -306,6 +358,30 @@ impl Runner {
                         Ok(_) => {}
                         Err(e) => println!("Error: {}", e),
                     }
+                }
+
+                Ok(true)
+            }
+            Command::MemDump(_target) => {
+                let start = 0u16;
+                let end = start + (self.msx.mem_size() - 1) as u16;
+
+                println!("Memory dump from {:#06X} to {:#06X}", start, end);
+
+                let mut addr = start;
+                'main: while addr <= end {
+                    let mut line = format!("{:04X}: ", addr);
+                    let mut chars = String::new();
+                    for _ in 0..=16 {
+                        line.push_str(&format!("{:02X} ", self.msx.get_memory(addr)));
+                        let c = self.msx.get_memory(addr) as char;
+                        chars.push(if c.is_ascii_graphic() { c } else { '.' });
+                        if addr >= end {
+                            break 'main;
+                        }
+                        addr += 1;
+                    }
+                    println!("{:>54} {}", line, chars);
                 }
 
                 Ok(true)

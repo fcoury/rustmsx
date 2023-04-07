@@ -26,18 +26,24 @@ impl Default for Memory {
 
 impl Memory {
     pub fn new(bus: Arc<RwLock<Bus>>, size: usize) -> Self {
-        let mut data = vec![0xFF; size];
+        let data = vec![0xFF; size];
+
+        // let mut data = vec![0xFF; size];
 
         // fill the addresses from FD9A through FFC9 with C9
-        (0xFD9A..=0xFFC9).for_each(|i| {
-            data[i] = 0xC9;
-        });
+        // (0xFD9A..=0xFFC9).for_each(|i| {
+        //     data[i] = 0xC9;
+        // });
 
-        (0x8003..=0xF37F).for_each(|i| {
-            data[i] = 0xFF;
-        });
+        // (0x8003..=0xF37F).for_each(|i| {
+        //     data[i] = 0xFF;
+        // });
 
         Memory { bus, data }
+    }
+
+    pub fn size(&self) -> usize {
+        self.data.len()
     }
 
     pub fn reset(&mut self) {
