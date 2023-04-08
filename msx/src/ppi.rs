@@ -4,7 +4,7 @@ use tracing::info;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct Ppi {
-    primary_slot_config: u8,
+    pub primary_slot_config: u8,
     register_b: u8,
     register_c: u8,
     control: u8,

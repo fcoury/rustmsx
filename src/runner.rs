@@ -2,6 +2,7 @@ use std::{num::ParseIntError, path::PathBuf};
 
 use anyhow::{anyhow, bail};
 use msx::{
+    bus::MemorySegment,
     slot::{RamSlot, RomSlot, SlotType},
     Msx, ProgramEntry,
 };
@@ -374,9 +375,20 @@ impl Runner {
             Command::Status => {
                 println!("Cycles: {}", self.cycles);
                 println!("Breakpoints: {:?}", self.breakpoints);
+                println!(
+                    "Primary Slot Config: {:08b}",
+                    self.msx.primary_slot_config()
+                );
                 for (n, slot) in self.slots.iter().enumerate() {
                     println!("Slot #{}: {}", n, slot);
                 }
+                self.msx
+                    .memory_segments()
+                    .iter()
+                    .enumerate()
+                    .for_each(|(n, segment)| {
+                        println!("Segment {}: {}", n, segment);
+                    });
                 self.msx.print_memory_page_info();
                 println!();
                 Ok(true)
@@ -506,6 +518,10 @@ impl Runner {
         }
 
         res
+    }
+
+    pub fn memory_segments(&self) -> Vec<MemorySegment> {
+        self.msx.memory_segments()
     }
 }
 

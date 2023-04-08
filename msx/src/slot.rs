@@ -44,6 +44,14 @@ impl SlotType {
             SlotType::Rom(slot) => slot.write(address, value),
         }
     }
+
+    pub fn size(&self) -> u16 {
+        match self {
+            SlotType::Empty => 0,
+            SlotType::Ram(slot) => slot.size,
+            SlotType::Rom(slot) => slot.size,
+        }
+    }
 }
 
 #[typetag::serde(tag = "type")]

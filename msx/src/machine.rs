@@ -7,7 +7,12 @@ use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bus::Bus, cpu::Z80, instruction::Instruction, slot::SlotType, utils::hexdump, vdp::TMS9918,
+    bus::{Bus, MemorySegment},
+    cpu::Z80,
+    instruction::Instruction,
+    slot::SlotType,
+    utils::hexdump,
+    vdp::TMS9918,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -199,7 +204,7 @@ impl Msx {
         let program_end = program_start + size;
 
         for pc in program_start..program_end {
-            let instr = Instruction::parse(&self.cpu);
+            let instr = Instruction::parse_at(&self.cpu, pc);
             program.push(ProgramEntry {
                 address: pc,
                 instruction: instr.name().to_string(),
@@ -250,5 +255,15 @@ impl Msx {
     pub fn step(&mut self) {
         self.cpu.execute_cycle();
         self.current_scanline = (self.current_scanline + 1) % 192;
+    }
+
+    pub fn primary_slot_config(&self) -> u8 {
+        let bus = self.bus.read().unwrap();
+        bus.primary_slot_config()
+    }
+
+    pub fn memory_segments(&self) -> Vec<MemorySegment> {
+        let bus = self.bus.read().unwrap();
+        bus.memory_segments()
     }
 }

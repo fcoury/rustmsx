@@ -1,10 +1,28 @@
+use std::fmt;
+
 use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
+use super::{ppi::Ppi, sound::AY38910, vdp::TMS9918};
 use crate::slot::SlotType;
 
-use super::{ppi::Ppi, sound::AY38910, vdp::TMS9918};
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct MemorySegment {
+    start: u16,
+    end: u16,
+    slot: u8,
+}
+
+impl fmt::Display for MemorySegment {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "0x{:04X} - 0x{:04X} (slot {})",
+            self.start, self.end, self.slot
+        )
+    }
+}
 
 #[derive(Derivative, Clone, Serialize, Deserialize)]
 #[derivative(Debug, PartialEq)]
@@ -17,8 +35,6 @@ pub struct Bus {
     pub ppi: Ppi,
 
     vdp_io_clock: u8,
-    primary_slot_config: u8,
-
     slots: [SlotType; 4],
 }
 
@@ -32,7 +48,6 @@ impl Default for Bus {
             psg: AY38910::new(),
             ppi: Ppi::new(),
             vdp_io_clock: 0,
-            primary_slot_config: 0x00,
             slots: [
                 SlotType::Empty,
                 SlotType::Empty,
@@ -51,7 +66,6 @@ impl Bus {
             psg: AY38910::new(),
             ppi: Ppi::new(),
             vdp_io_clock: 0,
-            primary_slot_config: 0x00,
             slots: [
                 slots.get(0).unwrap().clone(),
                 slots.get(1).unwrap().clone(),
@@ -95,12 +109,12 @@ impl Bus {
     }
 
     pub fn read_byte(&self, addr: u16) -> u8 {
-        let slot_number = self.get_slot_number_for_address(addr);
+        let (slot_number, addr) = self.translate_address(addr);
         self.slots[slot_number].read(addr)
     }
 
     pub fn write_byte(&mut self, addr: u16, data: u8) {
-        let slot_number = self.get_slot_number_for_address(addr);
+        let (slot_number, addr) = self.translate_address(addr);
         self.slots[slot_number].write(addr, data);
     }
 
@@ -117,17 +131,28 @@ impl Bus {
         (high_byte << 8) | low_byte
     }
 
-    fn get_slot_number_for_address(&self, addr: u16) -> usize {
-        let page = (addr >> 14) & 0x03;
-        let shift = page * 2;
-        ((self.primary_slot_config >> shift) & 0x03) as usize
+    pub fn primary_slot_config(&self) -> u8 {
+        self.ppi.primary_slot_config
+    }
+
+    pub fn translate_address(&self, address: u16) -> (usize, u16) {
+        let segments = self.memory_segments();
+        for segment in &segments {
+            if address >= segment.start && address <= segment.end {
+                let relative_address = address - segment.start;
+                return (segment.slot as usize, relative_address);
+            }
+        }
+
+        // This should not be reached; if it is, there's an issue with the memory segments.
+        panic!("Address not found in any segment: {:#x}", address);
     }
 
     pub fn print_memory_page_info(&self) {
         for page in 0..4 {
             let start_address = page * 0x4000;
             let end_address = start_address + 0x3FFF;
-            let slot_number = ((self.primary_slot_config >> (page * 2)) & 0x03) as usize;
+            let slot_number = ((self.ppi.primary_slot_config >> (page * 2)) & 0x03) as usize;
             let slot_type = self.slots.get(slot_number).unwrap();
 
             println!(
@@ -135,5 +160,199 @@ impl Bus {
                 page, start_address, end_address, slot_number, slot_type
             );
         }
+    }
+
+    pub fn memory_segments(&self) -> Vec<MemorySegment> {
+        let s = self.ppi.primary_slot_config;
+        let mut c: Option<MemorySegment> = None;
+
+        let mut segments = Vec::new();
+        for n in 0..4 {
+            // let pos = 3 - n;
+            let pos = n;
+            let slot = (s >> (pos * 2)) & 0b11;
+            let start = n * 16 * 1024;
+
+            c = match c {
+                Some(c) => {
+                    if c.slot != slot {
+                        segments.push(c);
+                        Some(MemorySegment {
+                            start,
+                            end: (start as u32 + 16 * 1024 - 1) as u16,
+                            slot,
+                        })
+                    } else {
+                        Some(MemorySegment {
+                            start: c.start,
+                            end: (start as u32 + 16 * 1024 - 1) as u16,
+                            slot,
+                        })
+                    }
+                }
+                None => Some(MemorySegment {
+                    start,
+                    end: (start as u32 + 16 * 1024 - 1) as u16,
+                    slot,
+                }),
+            }
+        }
+        segments.push(c.unwrap());
+        segments
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::slot::{RamSlot, RomSlot};
+
+    use super::*;
+
+    #[test]
+    fn test() {
+        let s: u8 = 0b00001111;
+        let mut c: Option<MemorySegment> = None;
+
+        let mut segments = Vec::new();
+        for n in 0..4 {
+            let pos = 3 - n;
+            let slot = (s >> (pos * 2)) & 0b11;
+            let start = n * 16 * 1024;
+            println!("slot: {:02X} start: {:04X}", slot, start);
+
+            c = match c {
+                Some(c) => {
+                    println!("current: {:?}", c);
+                    if c.slot != slot {
+                        segments.push(c);
+                        Some(MemorySegment {
+                            start,
+                            end: start + 16 * 1024 - 1,
+                            slot,
+                        })
+                    } else {
+                        Some(MemorySegment {
+                            start: c.start,
+                            end: (start as u32 + 16 * 1024 - 1) as u16,
+                            slot,
+                        })
+                    }
+                }
+                None => Some(MemorySegment {
+                    start,
+                    end: (start as u32 + 16 * 1024 - 1) as u16,
+                    slot,
+                }),
+            }
+        }
+        segments.push(c.unwrap());
+
+        println!("{:?}", segments);
+    }
+
+    #[test]
+    fn test_slot_definition() {
+        let mut bus = Bus::new(&[
+            SlotType::Rom(RomSlot::new(&[0; 0x8000], 0x0000, 0x8000)),
+            SlotType::Empty,
+            SlotType::Empty,
+            SlotType::Ram(RamSlot::new(0x0000, 0xFFFF)),
+        ]);
+
+        bus.ppi.primary_slot_config = 0b0000000;
+        let segments = bus.memory_segments();
+        assert_eq!(segments.len(), 1);
+        let segment = segments.get(0).unwrap();
+        assert_eq!(segment.slot, 0);
+        assert_eq!(segment.start, 0x0000);
+        assert_eq!(segment.end, 0xFFFF);
+        assert_eq!(segments.get(1), None);
+        assert_eq!(segments.get(2), None);
+        assert_eq!(segments.get(3), None);
+
+        bus.ppi.primary_slot_config = 0b00001111;
+        let segments = bus.memory_segments();
+        assert_eq!(segments.len(), 2);
+        let segment = segments.get(0).unwrap();
+        assert_eq!(segment.slot, 0);
+        assert_eq!(segment.start, 0x0000);
+        assert_eq!(segment.end, 0x7FFF);
+        let segment = segments.get(1).unwrap();
+        assert_eq!(segment.slot, 3);
+        assert_eq!(segment.start, 0x8000);
+        assert_eq!(segment.end, 0xFFFF);
+        assert_eq!(segments.get(2), None);
+        assert_eq!(segments.get(3), None);
+
+        bus.ppi.primary_slot_config = 0b11010000;
+        let segments = bus.memory_segments();
+        assert_eq!(segments.len(), 3);
+        let segment = segments.get(0).unwrap();
+        assert_eq!(segment.slot, 3);
+        assert_eq!(segment.start, 0x0000);
+        assert_eq!(segment.end, 0x3FFF);
+        let segment = segments.get(1).unwrap();
+        assert_eq!(segment.slot, 1);
+        assert_eq!(segment.start, 0x4000);
+        assert_eq!(segment.end, 0x7FFF);
+        let segment = segments.get(2).unwrap();
+        assert_eq!(segment.slot, 0);
+        assert_eq!(segment.start, 0x8000);
+        assert_eq!(segment.end, 0xFFFF);
+        assert_eq!(segments.get(3), None);
+
+        bus.ppi.primary_slot_config = 0b11011110;
+        let segments = bus.memory_segments();
+        assert_eq!(segments.len(), 4);
+        let segment = segments.get(0).unwrap();
+        assert_eq!(segment.slot, 3);
+        assert_eq!(segment.start, 0x0000);
+        assert_eq!(segment.end, 0x3FFF);
+        let segment = segments.get(1).unwrap();
+        assert_eq!(segment.slot, 1);
+        assert_eq!(segment.start, 0x4000);
+        assert_eq!(segment.end, 0x7FFF);
+        let segment = segments.get(2).unwrap();
+        assert_eq!(segment.slot, 3);
+        assert_eq!(segment.start, 0x8000);
+        assert_eq!(segment.end, 0xBFFF);
+        let segment = segments.get(3).unwrap();
+        assert_eq!(segment.slot, 2);
+        assert_eq!(segment.start, 0xC000);
+        assert_eq!(segment.end, 0xFFFF);
+    }
+
+    #[test]
+    fn test_address_translation() {
+        let mut bus = Bus::new(&[
+            SlotType::Rom(RomSlot::new(&[0; 0x8000], 0x0000, 0x8000)),
+            SlotType::Empty,
+            SlotType::Empty,
+            SlotType::Ram(RamSlot::new(0x0000, 0xFFFF)),
+        ]);
+
+        bus.ppi.primary_slot_config = 0b0000000;
+        assert_eq!(bus.translate_address(0x0FFF), (0, 0x0FFF));
+        assert_eq!(bus.translate_address(0x4FFF), (0, 0x4FFF));
+        assert_eq!(bus.translate_address(0x8FFF), (0, 0x8FFF));
+        assert_eq!(bus.translate_address(0xFFFF), (0, 0xFFFF));
+
+        bus.ppi.primary_slot_config = 0b00001111;
+        assert_eq!(bus.translate_address(0x0FFF), (0, 0x0FFF));
+        assert_eq!(bus.translate_address(0x4FFF), (0, 0x4FFF));
+        assert_eq!(bus.translate_address(0x8FFF), (3, 0x0FFF));
+        assert_eq!(bus.translate_address(0xCFFF), (3, 0x4FFF));
+
+        bus.ppi.primary_slot_config = 0b00011111;
+        assert_eq!(bus.translate_address(0x0FFF), (0, 0x0FFF));
+        assert_eq!(bus.translate_address(0x4FFF), (1, 0x0FFF));
+        assert_eq!(bus.translate_address(0x8FFF), (3, 0x0FFF));
+        assert_eq!(bus.translate_address(0xFFFF), (3, 0x7FFF));
+
+        bus.ppi.primary_slot_config = 0b10011111;
+        assert_eq!(bus.translate_address(0x0FFF), (2, 0x0FFF));
+        assert_eq!(bus.translate_address(0x4FFF), (1, 0x0FFF));
+        assert_eq!(bus.translate_address(0x8FFF), (3, 0x0FFF));
+        assert_eq!(bus.translate_address(0xFFFF), (3, 0x7FFF));
     }
 }

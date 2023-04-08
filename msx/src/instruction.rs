@@ -12,12 +12,12 @@ pub struct Instruction<'a> {
 
 impl<'a> Instruction<'a> {
     pub fn parse(cpu: &'a Z80) -> Self {
-        let opcode = cpu.read_byte(cpu.pc);
-        Instruction {
-            opcode,
-            cpu,
-            pc: cpu.pc,
-        }
+        Self::parse_at(cpu, cpu.pc)
+    }
+
+    pub fn parse_at(cpu: &'a Z80, pc: u16) -> Self {
+        let opcode = cpu.read_byte(pc);
+        Instruction { opcode, cpu, pc }
     }
 
     pub fn name(&self) -> String {
