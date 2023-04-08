@@ -1,8 +1,8 @@
-use std::{num::ParseIntError, path::PathBuf, rc::Rc};
+use std::{num::ParseIntError, path::PathBuf};
 
 use anyhow::{anyhow, bail};
 use msx::{
-    slot::{EmptySlot, RamSlot, RomSlot, Slot},
+    slot::{RamSlot, RomSlot, SlotType},
     Msx, ProgramEntry,
 };
 use rustyline::DefaultEditor;
@@ -21,7 +21,7 @@ pub struct Runner {
     pub break_on_mismatch: bool,
     pub track_flags: bool,
 
-    slots: Vec<Rc<dyn Slot>>,
+    slots: Vec<SlotType>,
     running: bool,
     cycles: u64,
     client: Option<Client>,
@@ -526,7 +526,7 @@ fn parse_as_u16(s: &str) -> Result<u16, ParseIntError> {
 }
 
 pub struct RunnerBuilder {
-    slots: Vec<Rc<dyn Slot>>,
+    slots: Vec<SlotType>,
     breakpoints: Vec<u16>,
     max_cycles: Option<u64>,
     open_msx: bool,
@@ -572,12 +572,12 @@ impl RunnerBuilder {
     }
 
     pub fn empty_slot(&mut self) -> &mut Self {
-        self.slots.push(Rc::new(EmptySlot::new()));
+        self.slots.push(SlotType::Empty);
         self
     }
 
     pub fn ram_slot(&mut self, base: u16, size: u16) -> &mut Self {
-        self.slots.push(Rc::new(RamSlot::new(base, size)));
+        self.slots.push(SlotType::Ram(RamSlot::new(base, size)));
         self
     }
 
@@ -588,7 +588,7 @@ impl RunnerBuilder {
         size: u16,
     ) -> anyhow::Result<&mut Self> {
         self.slots
-            .push(Rc::new(RomSlot::load(rom_path, base, size)?));
+            .push(SlotType::Rom(RomSlot::load(rom_path, base, size)?));
         Ok(self)
     }
 

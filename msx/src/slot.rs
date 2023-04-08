@@ -2,11 +2,29 @@ use std::{fmt::Debug, fs::File, io::Read, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub enum SlotType {
-    Empty(EmptySlot),
+    Empty,
     Ram(RamSlot),
     Rom(RomSlot),
+}
+
+impl SlotType {
+    pub fn read(&self, address: u16) -> u8 {
+        match self {
+            SlotType::Empty => 0xFF,
+            SlotType::Ram(slot) => slot.read(address),
+            SlotType::Rom(slot) => slot.read(address),
+        }
+    }
+
+    pub fn write(&mut self, address: u16, value: u8) {
+        match self {
+            SlotType::Empty => {}
+            SlotType::Ram(slot) => slot.write(address, value),
+            SlotType::Rom(slot) => slot.write(address, value),
+        }
+    }
 }
 
 #[typetag::serde(tag = "type")]
@@ -15,25 +33,7 @@ pub trait Slot: Debug {
     fn write(&mut self, address: u16, value: u8);
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
-pub struct EmptySlot;
-
-impl EmptySlot {
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
-#[typetag::serde]
-impl Slot for EmptySlot {
-    fn read(&self, _address: u16) -> u8 {
-        0xFF
-    }
-
-    fn write(&mut self, _address: u16, _value: u8) {}
-}
-
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Clone)]
 pub struct RomSlot {
     pub rom_path: Option<PathBuf>,
     pub base: u16,
@@ -82,7 +82,7 @@ impl Slot for RomSlot {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Clone)]
 pub struct RamSlot {
     pub base: u16,
     pub size: u16,

@@ -3,13 +3,12 @@ use std::io::{BufReader, BufWriter, Read, Write};
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::process::Command;
-use std::rc::Rc;
 use std::time::Instant;
 use std::{env, fs};
 
 use anyhow::{anyhow, bail, Error, Result};
 use handlebars::Handlebars;
-use msx::slot::Slot;
+use msx::slot::SlotType;
 use path_absolutize::*;
 use serde_json::json;
 use sha1::{Digest, Sha1};
@@ -99,7 +98,7 @@ impl Client {
         }
     }
 
-    pub fn new(slots: &Vec<Rc<dyn Slot>>) -> Result<Client, Error> {
+    pub fn new(slots: &[SlotType]) -> Result<Client, Error> {
         let machine_xml = PathBuf::new()
             .join(dirs::home_dir().unwrap())
             .join(".openMsx")
@@ -109,15 +108,12 @@ impl Client {
 
         let template = std::fs::read_to_string("src/template.xml.handlebars")?;
 
-        let json = serde_json::to_value(slots)?;
-        let mut slots = Vec::new();
-        for (n, slot) in json.as_array().unwrap().iter().enumerate() {
-            let slot = slot.as_object().unwrap();
-            let typ = slot.get("type").unwrap().as_str().unwrap();
-            match typ {
-                "RomSlot" => {
-                    let rom_path = slot.get("rom_path").unwrap().as_str().unwrap();
-                    let rom_path = PathBuf::from(rom_path);
+        let slots_json: anyhow::Result<Vec<_>> = slots
+            .iter()
+            .enumerate()
+            .map(|(n, slot)| match slot {
+                SlotType::Rom(slot) => {
+                    let rom_path = slot.rom_path.clone().unwrap();
                     let file = File::open(&rom_path)?;
                     let mut reader = BufReader::new(file);
                     let mut buffer = Vec::new();
@@ -126,42 +122,29 @@ impl Client {
                     let mut hasher = Sha1::new();
                     hasher.update(&buffer);
 
-                    let base = slot.get("base").unwrap().as_i64().unwrap() as u16;
-                    let size = slot.get("size").unwrap().as_i64().unwrap() as u16;
-
-                    slots.push(json!({
+                    Ok(json!({
                         "n": n,
                         "isRom": true,
-                        "base": format!("0x{:04X}", base),
-                        "size": format!("0x{:04X}", size),
+                        "base": format!("0x{:04X}", slot.base),
+                        "size": format!("0x{:04X}", slot.size),
                         "rom_path": rom_path.absolutize().unwrap().to_str().unwrap().to_string(),
                         "sha1": format!("{:x}", hasher.finalize()),
-                    }));
+                    }))
                 }
-                "EmptySlot" => slots.push(json!({
+                SlotType::Empty => Ok(json!({
                     "n": n,
                     "isEmpty": true,
                 })),
-                "RamSlot" => {
-                    let base = slot.get("base").unwrap().as_i64().unwrap() as u16;
-                    let size = slot.get("size").unwrap().as_i64().unwrap() as u32;
+                SlotType::Ram(slot) => Ok(json!({
+                    "n": n,
+                    "isRam": true,
+                    "base": format!("0x{:04X}", slot.base),
+                    "size": format!("0x{:05X}", slot.size as u32 + 1),
+                })),
+            })
+            .collect();
 
-                    slots.push(json!({
-                        "n": n,
-                        "isRam": true,
-                        "base": format!("0x{:04X}", base),
-                        "size": format!("0x{:05X}", size+1),
-                    }));
-                }
-                _ => {
-                    bail!("Unknown slot type: {}", typ);
-                }
-            }
-        }
-
-        let json = json!({
-            "slots": slots,
-        });
+        let json = json!({ "slots": slots_json? });
         let reg = Handlebars::new();
         let contents = reg.render_template(&template, &json).unwrap();
 

@@ -17,14 +17,14 @@ rustmsx-wasm = {path = "rustmsx-wasm"}
 anyhow = "1.0.70"
 clap = {version = "4.1.13", features = ["derive", "env"]}
 dirs = "5.0.0"
+handlebars = "4.3.6"
 path-absolutize = "3.0.14"
 rustyline = "11.0.0"
-serde = { version = "1.0.159", features = ["derive", "rc"] }
+serde = {version = "1.0.159", features = ["derive", "rc", "std"]}
+serde_json = "1.0.95"
 sha1 = "0.10.5"
 similar = "2.2.1"
 tracing = "0.1.37"
 tracing-subscriber = {version = "0.3.16", features = ["env-filter"]}
 walkdir = "2.3.3"
 xml-rs = "0.8.4"
-handlebars = "4.3.6"
-serde_json = "1.0.95"

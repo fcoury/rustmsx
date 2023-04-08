@@ -1,10 +1,8 @@
-use std::rc::Rc;
-
 use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
-use crate::slot::{EmptySlot, Slot};
+use crate::slot::SlotType;
 
 use super::{ppi::Ppi, sound::AY38910, vdp::TMS9918};
 
@@ -21,8 +19,7 @@ pub struct Bus {
     vdp_io_clock: u8,
     primary_slot_config: u8,
 
-    #[derivative(PartialEq = "ignore")]
-    slots: [Rc<dyn Slot>; 4],
+    slots: [SlotType; 4],
 }
 
 impl Default for Bus {
@@ -35,12 +32,12 @@ impl Default for Bus {
             psg: AY38910::new(),
             ppi: Ppi::new(),
             vdp_io_clock: 0,
-            primary_slot_config: 0,
+            primary_slot_config: 0x00,
             slots: [
-                Rc::new(EmptySlot::new()),
-                Rc::new(EmptySlot::new()),
-                Rc::new(EmptySlot::new()),
-                Rc::new(EmptySlot::new()),
+                SlotType::Empty,
+                SlotType::Empty,
+                SlotType::Empty,
+                SlotType::Empty,
             ],
         }
     }
@@ -78,5 +75,21 @@ impl Bus {
                 error!("[BUS] Invalid port {:02X} write", port);
             }
         };
+    }
+
+    pub fn read_byte(self, addr: u16) -> u8 {
+        let slot_number = self.get_slot_number_for_address(addr);
+        self.slots[slot_number].read(addr)
+    }
+
+    pub fn write_byte(&mut self, addr: u16, data: u8) {
+        let slot_number = self.get_slot_number_for_address(addr);
+        self.slots[slot_number].write(addr, data);
+    }
+
+    fn get_slot_number_for_address(&self, addr: u16) -> usize {
+        let page = (addr >> 14) & 0x03;
+        let shift = page * 2;
+        ((self.primary_slot_config >> shift) & 0x03) as usize
     }
 }
