@@ -95,6 +95,16 @@ impl Msx {
         }
     }
 
+    pub fn load_rom(&mut self, slot: u8, data: &[u8]) {
+        let mut bus = self.bus.write().unwrap();
+        bus.load_rom(slot, data);
+    }
+
+    pub fn load_ram(&mut self, slot: u8) {
+        let mut bus = self.bus.write().unwrap();
+        bus.load_ram(slot);
+    }
+
     pub fn print_memory_page_info(&self) {
         let bus = self.bus.read().unwrap();
         bus.print_memory_page_info();
@@ -111,8 +121,7 @@ impl Msx {
     }
 
     pub fn ram(&self) -> Vec<u8> {
-        // self.cpu.memory.data.to_vec()
-        todo!()
+        self.cpu.memory()
     }
 
     pub fn vram(&self) -> Vec<u8> {

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use tracing::error;
 
 use super::{ppi::Ppi, sound::AY38910, vdp::TMS9918};
-use crate::slot::SlotType;
+use crate::slot::{RamSlot, RomSlot, SlotType};
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct MemorySegment {
@@ -199,6 +199,14 @@ impl Bus {
         }
         segments.push(c.unwrap());
         segments
+    }
+
+    pub fn load_rom(&mut self, slot: u8, rom: &[u8]) {
+        self.slots[slot as usize] = SlotType::Rom(RomSlot::new(rom, 0x0000, 0x8000));
+    }
+
+    pub fn load_ram(&mut self, slot: u8) {
+        self.slots[slot as usize] = SlotType::Ram(RamSlot::new(0x0000, 0xFFFF));
     }
 }
 

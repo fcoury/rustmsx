@@ -54,7 +54,6 @@ impl SlotType {
     }
 }
 
-#[typetag::serde(tag = "type")]
 pub trait Slot: Debug {
     fn read(&self, address: u16) -> u8;
     fn write(&mut self, address: u16, value: u8);
@@ -96,7 +95,6 @@ impl RomSlot {
     }
 }
 
-#[typetag::serde]
 impl Slot for RomSlot {
     fn read(&self, address: u16) -> u8 {
         let address = self.translate_address(address);
@@ -133,7 +131,6 @@ impl RamSlot {
     }
 }
 
-#[typetag::serde]
 impl Slot for RamSlot {
     fn read(&self, address: u16) -> u8 {
         let address = self.translate_address(address);
