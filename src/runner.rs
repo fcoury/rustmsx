@@ -2,7 +2,6 @@ use std::{num::ParseIntError, path::PathBuf};
 
 use anyhow::{anyhow, bail};
 use msx::{
-    bus::MemorySegment,
     slot::{RamSlot, RomSlot, SlotType},
     Msx, ProgramEntry,
 };
@@ -21,6 +20,7 @@ pub struct Runner {
     pub open_msx: bool,
     pub break_on_mismatch: bool,
     pub track_flags: bool,
+    pub report_every: Option<u64>,
 
     slots: Vec<SlotType>,
     running: bool,
@@ -194,6 +194,13 @@ impl Runner {
 
         loop {
             self.step()?;
+
+            if let Some(report_every) = self.report_every {
+                if self.cycles % report_every == 0 {
+                    println!("\rCycles: {} PC: {:04X}", self.cycles, self.msx.pc());
+                    self.dump()?;
+                }
+            }
 
             let mut stop = !self.running;
 
@@ -519,10 +526,6 @@ impl Runner {
 
         res
     }
-
-    pub fn memory_segments(&self) -> Vec<MemorySegment> {
-        self.msx.memory_segments()
-    }
 }
 
 fn parse_as_u8(s: &str) -> Result<u8, ParseIntError> {
@@ -552,6 +555,7 @@ pub struct RunnerBuilder {
     open_msx: bool,
     break_on_mismatch: bool,
     track_flags: bool,
+    report_every: Option<u64>,
 }
 
 impl RunnerBuilder {
@@ -563,6 +567,7 @@ impl RunnerBuilder {
             open_msx: false,
             break_on_mismatch: false,
             track_flags: false,
+            report_every: None,
         }
     }
 
@@ -612,6 +617,11 @@ impl RunnerBuilder {
         Ok(self)
     }
 
+    pub fn report_every(&mut self, n_cycles: Option<u64>) -> &mut Self {
+        self.report_every = n_cycles;
+        self
+    }
+
     pub fn build(&self) -> Runner {
         Runner {
             slots: self.slots.clone(),
@@ -620,6 +630,7 @@ impl RunnerBuilder {
             open_msx: self.open_msx,
             break_on_mismatch: self.break_on_mismatch,
             track_flags: self.track_flags,
+            report_every: self.report_every,
             running: false,
             client: None,
             msx: Msx::new(&self.slots),

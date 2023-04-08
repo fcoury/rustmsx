@@ -29,6 +29,9 @@ pub struct Cli {
     break_on_mismatch: bool,
 
     #[clap(short, long)]
+    report_every: Option<u64>,
+
+    #[clap(short, long)]
     debug: bool,
 
     #[clap(long)]
@@ -65,6 +68,7 @@ pub fn main() -> anyhow::Result<()> {
         )
         .open_msx(cli.open_msx)
         .break_on_mismatch(cli.break_on_mismatch)
+        .report_every(cli.report_every)
         .build();
     runner.run()?;
 
