@@ -174,6 +174,11 @@ impl Client {
         Ok(res)
     }
 
+    pub fn vram_dump(&mut self) -> anyhow::Result<String> {
+        let res = self.send("showdebuggable VRAM 0000 1024")?;
+        Ok(res)
+    }
+
     pub fn shutdown(&mut self) -> Result<()> {
         self.send("set power off")?;
         Ok(())

@@ -8,7 +8,9 @@ use std::{
 use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 
-use crate::{bus::Bus, cpu::Z80, instruction::Instruction, memory::Memory, vdp::TMS9918};
+use crate::{
+    bus::Bus, cpu::Z80, instruction::Instruction, memory::Memory, utils::hexdump, vdp::TMS9918,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ProgramEntry {
@@ -135,34 +137,13 @@ impl Msx {
     }
 
     pub fn memory_dump(&mut self, start: u16, end: u16) -> String {
-        let mut str = String::new();
-        let mut addr = start;
-        while addr < end {
-            let mut line = format!("{:04x}: ", addr);
-            let mut chars = String::new();
-            for _ in 0..16 {
-                if addr <= end {
-                    line.push_str(&format!("{:02x} ", self.get_memory(addr)));
-                    let c = self.get_memory(addr) as char;
-                    chars.push(if c.is_ascii_graphic() || c == ' ' {
-                        c
-                    } else {
-                        '.'
-                    });
+        hexdump(&self.cpu.memory.data, start, end)
+    }
 
-                    addr = addr.wrapping_add(1);
-                }
-            }
-
-            let dump_line = format!("{:>54} {}\n", line, chars);
-            str.push_str(&dump_line);
-
-            if addr == 0 {
-                break;
-            }
-        }
-
-        str
+    pub fn vram_dump(&self) -> String {
+        let bus = self.bus.read().unwrap();
+        let vdp = bus.vdp.clone();
+        hexdump(&vdp.vram, 0, 0x4000)
     }
 
     pub fn load_binary(&mut self, path: &str) -> std::io::Result<()> {

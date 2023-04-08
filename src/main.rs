@@ -30,14 +30,18 @@ pub struct Cli {
 
     #[clap(short, long)]
     debug: bool,
+
+    #[clap(long)]
+    debug_ppi: bool,
 }
 
 pub fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     let log_level = format!(
-        "msx_emulator={},msx::cpu=error,msx::vdp=error,msx::ppi=error,info",
-        if cli.debug { "trace" } else { "info" }
+        "msx_emulator={},msx::cpu=error,msx::vdp=error,msx::ppi={},info",
+        if cli.debug { "trace" } else { "info" },
+        if cli.debug_ppi { "trace" } else { "error" }
     );
     let subscriber = FmtSubscriber::builder()
         .with_env_filter(

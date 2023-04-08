@@ -4,7 +4,7 @@ use tracing::info;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct Ppi {
-    register_a: u8,
+    primary_slot_config: u8,
     register_b: u8,
     register_c: u8,
     control: u8,
@@ -15,7 +15,7 @@ pub struct Ppi {
 impl Ppi {
     pub fn new() -> Self {
         Ppi {
-            register_a: 0,
+            primary_slot_config: 0,
             register_b: 0,
             register_c: 0x50, // Everything OFF. Motor and CapsLed = 1 means OFF
             control: 0,
@@ -44,13 +44,16 @@ impl Ppi {
             0xA8 => {
                 // get primary slot config
                 info!(
-                    "[PPI] Reading from PPI port {:02X} = {:02X}",
-                    port, self.register_a,
+                    "[PPI] [RD] [PrimarySlot] [{:02X}] = {:02X}",
+                    port, self.primary_slot_config,
                 );
-                self.register_a
+                self.primary_slot_config
             }
             0xA9 => {
-                // returns the keyboard port
+                info!(
+                    "[PPI] [RD] [KeybordPort] [{:02X}] = {:02X}",
+                    port, self.register_b
+                );
                 self.register_b
             }
             0xAA => {
@@ -62,9 +65,14 @@ impl Ppi {
                 // if (mod & 0xa0) updatePulseSignal();
                 // if (mod & 0x40) updateCapsLed();
 
+                info!(
+                    "[PPI] [RD] [Register C ] [{:02X}] = {:02X}",
+                    port, self.register_c
+                );
                 self.register_c
             }
             0xAB => {
+                info!("[PPI] [RD] [IgnoredPort] [{:02X}] = {:02X}", port, 0xFF);
                 // ignored output port
                 0xFF
             }
@@ -75,16 +83,16 @@ impl Ppi {
     pub fn write(&mut self, port: u8, value: u8) {
         match port {
             0xA8 => {
+                info!("[PPI] [WR] [PrimarySlot] [{:02X}] = {:02X}", port, value);
                 // set primary slot config
-                info!("[PPI] Writing '{:02X}' to PPI port 0xA8", value);
-                self.register_a = value;
+                self.primary_slot_config = value;
             }
             0xA9 => {
-                info!("[PPI] Writing '{:02X}' to PPI port 0xA9", value);
                 // this port is ignored as output -- input only
+                info!("[PPI] [WR] [IgnoredPort] [{:02X}] = {:02X}", port, value);
             }
             0xAA => {
-                info!("[PPI] Writing '{:02X}' to PPI port 0xAA", value);
+                info!("[PPI] [WR] [PpiControl1] [{:02X}] = {:02X}", port, value);
                 let mode = self.register_c ^ value;
                 if mode == 0 {
                     return;
@@ -99,7 +107,7 @@ impl Ppi {
                 // else if (bit === 6) updateCapsLed();
             }
             0xAB => {
-                info!("[PPI] Writing '{:02X}' to PPI port 0xAB (control)", value);
+                info!("[PPI] [WR] [PpiControl2] [{:02X}] = {:02X}", port, value);
                 let bit = (value & 0x0e) >> 1;
                 if (value & 0x01) == 0 {
                     self.register_c &= !(1 << bit);

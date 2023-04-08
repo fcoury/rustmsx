@@ -62,6 +62,9 @@ enum Command {
     /// lists the execution log
     Log,
 
+    /// Status
+    Status,
+
     /// adds a breakpoint address
     AddBreakpoint(u16),
 
@@ -73,6 +76,9 @@ enum Command {
 
     /// sets the value of a memory address
     MemSet(u16, u8),
+
+    /// dumps vram contents
+    VramDump(DumpTarget),
 
     /// dumps the contents of the memory
     MemDump(DumpTarget),
@@ -90,6 +96,15 @@ struct CommandLine {
 }
 
 impl CommandLine {
+    fn parse_target(target: Option<&str>) -> anyhow::Result<DumpTarget> {
+        match target {
+            Some("msx") => Ok(DumpTarget::Msx),
+            Some("openmsx") => Ok(DumpTarget::OpenMsx),
+            None | Some("diff") => Ok(DumpTarget::Diff),
+            _ => bail!("Invalid target. Use openmsx, msx or diff."),
+        }
+    }
+
     fn parse(line: &str) -> anyhow::Result<Self> {
         let mut parts = line.split_whitespace();
 
@@ -99,6 +114,7 @@ impl CommandLine {
             Some("cont") | Some("c") => Command::Continue,
             Some("reset") => Command::Reset,
             Some("list") | Some("l") => Command::List,
+            Some("status") | Some("st") => Command::Status,
             Some("set") | Some("s") => {
                 let target = match parts.next() {
                     Some("a") => SetTarget::A,
@@ -141,16 +157,10 @@ impl CommandLine {
                 Command::Send(args)
             }
             Some("memdump") | Some("md") => {
-                let target = match parts.next() {
-                    None | Some("diff") => DumpTarget::Diff,
-                    Some("openmsx") => DumpTarget::OpenMsx,
-                    Some("msx") => DumpTarget::Msx,
-                    _ => bail!(
-                        "Invalid target for memdump. Use openmsx, msx or leave it empty for msx."
-                    ),
-                };
-
-                Command::MemDump(target)
+                Command::MemDump(CommandLine::parse_target(parts.next())?)
+            }
+            Some("vramdump") | Some("vdpdump") | Some("vd") => {
+                Command::VramDump(CommandLine::parse_target(parts.next())?)
             }
             Some("log") => Command::Log,
             _ => bail!("Invalid command: {}", line),
@@ -205,6 +215,11 @@ impl Runner {
                 stop = true;
             }
 
+            if self.at_cycles_limit() {
+                println!("Breaking at cycle #{}", self.cycles);
+                stop = true;
+            }
+
             if stop || stop_next {
                 if stop_next {
                     println!("Stepped to {:#06X}", self.msx.pc());
@@ -241,6 +256,17 @@ impl Runner {
 
     pub fn at_breakpoint(&mut self) -> bool {
         self.breakpoints.contains(&self.msx.pc())
+    }
+
+    pub fn at_cycles_limit(&mut self) -> bool {
+        let is_at = self
+            .max_cycles
+            .map(|limit| self.cycles >= limit)
+            .unwrap_or(false);
+        if is_at {
+            self.max_cycles = None;
+        }
+        is_at
     }
 
     pub fn dump(&mut self) -> anyhow::Result<()> {
@@ -344,6 +370,12 @@ impl Runner {
                 self.log()?;
                 Ok(true)
             }
+            Command::Status => {
+                println!("Cycles: {}", self.cycles);
+                println!("Breakpoints: {:?}", self.breakpoints);
+                println!();
+                Ok(true)
+            }
             Command::MemSet(addr, value) => {
                 self.msx.set_memory(addr, value);
                 Ok(true)
@@ -387,6 +419,33 @@ impl Runner {
 
                 Ok(true)
             }
+            Command::VramDump(target) => {
+                match target {
+                    DumpTarget::Msx => {
+                        println!("VRAM dump");
+                        println!("{}", self.msx.vram_dump());
+                    }
+                    DumpTarget::OpenMsx => {
+                        if let Some(client) = &mut self.client {
+                            println!("VRAM dump");
+                            println!("{}", client.vram_dump()?);
+                        }
+                    }
+                    DumpTarget::Diff => {
+                        if let Some(client) = &mut self.client {
+                            let msx_dump = self.msx.vram_dump();
+                            let openmsx_dump = client.vram_dump()?;
+                            let diff = self.diff(msx_dump, openmsx_dump);
+
+                            println!("VRAM diff");
+                            println!("{}", diff);
+                        }
+                    }
+                }
+
+                println!();
+                Ok(true)
+            }
             Command::MemDump(target) => {
                 let start = 0u16;
                 let end = (self.msx.mem_size() - 1) as u16;
@@ -406,24 +465,9 @@ impl Runner {
                         if let Some(client) = &mut self.client {
                             let msx_dump = self.msx.memory_dump(start, end);
                             let openmsx_dump = client.memory_dump(start, end)?;
-                            let diff = TextDiff::from_lines(&msx_dump, &openmsx_dump);
 
-                            if !diff.iter_all_changes().any(|c| c.tag() != ChangeTag::Equal) {
-                                println!("No differences.");
-                                return Ok(true);
-                            }
-
-                            for change in diff.iter_all_changes() {
-                                if change.tag() == ChangeTag::Equal {
-                                    continue;
-                                }
-                                let sign = match change.tag() {
-                                    ChangeTag::Delete => "-",
-                                    ChangeTag::Insert => "+",
-                                    ChangeTag::Equal => " ",
-                                };
-                                print!("{}{}", sign, change);
-                            }
+                            println!("Memory diff from {:#06X} to {:#06X}", start, end);
+                            println!("{}", self.diff(msx_dump, openmsx_dump));
                         } else {
                             eprintln!("Can't diff memory: no openMSX connection.");
                         }
@@ -434,6 +478,29 @@ impl Runner {
                 Ok(true)
             }
         }
+    }
+
+    pub fn diff(&self, msx_dump: String, openmsx_dump: String) -> String {
+        let mut res = String::new();
+        let diff = TextDiff::from_lines(&msx_dump, &openmsx_dump);
+
+        if !diff.iter_all_changes().any(|c| c.tag() != ChangeTag::Equal) {
+            return "No differences.".to_string();
+        }
+
+        for change in diff.iter_all_changes() {
+            if change.tag() == ChangeTag::Equal {
+                continue;
+            }
+            let sign = match change.tag() {
+                ChangeTag::Delete => "-",
+                ChangeTag::Insert => "+",
+                ChangeTag::Equal => " ",
+            };
+            res.push_str(&format!("{}{}", sign, change));
+        }
+
+        res
     }
 }
 

@@ -5,6 +5,7 @@ pub mod machine;
 pub mod memory;
 pub mod ppi;
 pub mod sound;
+pub mod utils;
 pub mod vdp;
 
 pub use cpu::Z80;
