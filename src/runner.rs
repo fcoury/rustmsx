@@ -1,7 +1,10 @@
-use std::{num::ParseIntError, path::PathBuf};
+use std::{num::ParseIntError, path::PathBuf, rc::Rc};
 
 use anyhow::{anyhow, bail};
-use msx::{Msx, ProgramEntry};
+use msx::{
+    slot::{EmptySlot, RamSlot, RomSlot, Slot},
+    Msx, ProgramEntry,
+};
 use rustyline::DefaultEditor;
 use similar::{ChangeTag, TextDiff};
 
@@ -12,13 +15,13 @@ use crate::{
 };
 
 pub struct Runner {
-    pub rom: PathBuf,
     pub breakpoints: Vec<u16>,
     pub max_cycles: Option<u64>,
     pub open_msx: bool,
     pub break_on_mismatch: bool,
     pub track_flags: bool,
 
+    slots: Vec<Rc<dyn Slot>>,
     running: bool,
     cycles: u64,
     client: Option<Client>,
@@ -174,11 +177,9 @@ impl CommandLine {
 
 impl Runner {
     pub fn run(&mut self) -> anyhow::Result<()> {
-        self.msx.load_binary(self.rom.to_str().unwrap())?;
-
         self.client = if self.open_msx {
             Client::start()?;
-            let mut client = Client::new(self.rom.clone())?;
+            let mut client = Client::new(&self.slots)?;
             client.init()?;
 
             Some(client)
@@ -525,7 +526,7 @@ fn parse_as_u16(s: &str) -> Result<u16, ParseIntError> {
 }
 
 pub struct RunnerBuilder {
-    rom: PathBuf,
+    slots: Vec<Rc<dyn Slot>>,
     breakpoints: Vec<u16>,
     max_cycles: Option<u64>,
     open_msx: bool,
@@ -534,9 +535,9 @@ pub struct RunnerBuilder {
 }
 
 impl RunnerBuilder {
-    pub fn new(rom: PathBuf) -> Self {
+    pub fn new() -> Self {
         Self {
-            rom,
+            slots: Vec::new(),
             breakpoints: Vec::new(),
             max_cycles: None,
             open_msx: false,
@@ -545,34 +546,55 @@ impl RunnerBuilder {
         }
     }
 
-    pub fn with_breakpoints(&mut self, breakpoints: Vec<u16>) -> &mut Self {
+    pub fn breakpoints(&mut self, breakpoints: Vec<u16>) -> &mut Self {
         self.breakpoints = breakpoints;
         self
     }
 
-    pub fn with_max_cycles(&mut self, max_cycles: Option<u64>) -> &mut Self {
+    pub fn max_cycles(&mut self, max_cycles: Option<u64>) -> &mut Self {
         self.max_cycles = max_cycles;
         self
     }
 
-    pub fn with_open_msx(&mut self, open_msx: bool) -> &mut Self {
+    pub fn open_msx(&mut self, open_msx: bool) -> &mut Self {
         self.open_msx = open_msx;
         self
     }
 
-    pub fn with_break_on_mismatch(&mut self, break_on_mismatch: bool) -> &mut Self {
+    pub fn break_on_mismatch(&mut self, break_on_mismatch: bool) -> &mut Self {
         self.break_on_mismatch = break_on_mismatch;
         self
     }
 
-    pub fn with_track_flags(&mut self, track_flags: bool) -> &mut Self {
+    pub fn track_flags(&mut self, track_flags: bool) -> &mut Self {
         self.track_flags = track_flags;
         self
     }
 
+    pub fn empty_slot(&mut self) -> &mut Self {
+        self.slots.push(Rc::new(EmptySlot::new()));
+        self
+    }
+
+    pub fn ram_slot(&mut self, base: u16, size: u16) -> &mut Self {
+        self.slots.push(Rc::new(RamSlot::new(base, size)));
+        self
+    }
+
+    pub fn rom_slot_from_file(
+        &mut self,
+        rom_path: PathBuf,
+        base: u16,
+        size: u16,
+    ) -> anyhow::Result<&mut Self> {
+        self.slots
+            .push(Rc::new(RomSlot::load(rom_path, base, size)?));
+        Ok(self)
+    }
+
     pub fn build(&self) -> Runner {
         Runner {
-            rom: self.rom.clone(),
+            slots: self.slots.clone(),
             breakpoints: self.breakpoints.clone(),
             max_cycles: self.max_cycles,
             open_msx: self.open_msx,

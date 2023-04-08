@@ -1,9 +1,15 @@
+use std::rc::Rc;
+
+use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
+use crate::slot::{EmptySlot, Slot};
+
 use super::{ppi::Ppi, sound::AY38910, vdp::TMS9918};
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Derivative, Clone, Serialize, Deserialize)]
+#[derivative(Debug, PartialEq)]
 pub struct Bus {
     slot_count: u8,
 
@@ -14,7 +20,9 @@ pub struct Bus {
 
     vdp_io_clock: u8,
     primary_slot_config: u8,
-    slot3_secondary_config: u8,
+
+    #[derivative(PartialEq = "ignore")]
+    slots: [Rc<dyn Slot>; 4],
 }
 
 impl Default for Bus {
@@ -28,7 +36,12 @@ impl Default for Bus {
             ppi: Ppi::new(),
             vdp_io_clock: 0,
             primary_slot_config: 0,
-            slot3_secondary_config: 0,
+            slots: [
+                Rc::new(EmptySlot::new()),
+                Rc::new(EmptySlot::new()),
+                Rc::new(EmptySlot::new()),
+                Rc::new(EmptySlot::new()),
+            ],
         }
     }
 }

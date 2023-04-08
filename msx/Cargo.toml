@@ -15,3 +15,4 @@ thiserror = "1.0.40"
 time = {version = "0.3.20", features = ["wasm-bindgen"]}
 tracing = "0.1.37"
 tracing-subscriber = {version = "0.3.16", features = ["env-filter", "fmt", "time"]}
+typetag = "0.2.7"

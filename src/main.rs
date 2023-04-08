@@ -50,17 +50,21 @@ pub fn main() -> anyhow::Result<()> {
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
-    let mut runner = RunnerBuilder::new(cli.rom_path)
-        .with_max_cycles(cli.max_cycles)
-        .with_track_flags(cli.track_flags)
-        .with_breakpoints(
+    let mut runner = RunnerBuilder::new()
+        .rom_slot_from_file(cli.rom_path, 0x0000, 0x8000)?
+        .empty_slot()
+        .empty_slot()
+        .ram_slot(0x0000, 0xFFFF)
+        .max_cycles(cli.max_cycles)
+        .track_flags(cli.track_flags)
+        .breakpoints(
             cli.breakpoint
                 .iter()
                 .map(|s| u16::from_str_radix(s, 16).unwrap())
                 .collect(),
         )
-        .with_open_msx(cli.open_msx)
-        .with_break_on_mismatch(cli.break_on_mismatch)
+        .open_msx(cli.open_msx)
+        .break_on_mismatch(cli.break_on_mismatch)
         .build();
     runner.run()?;
 

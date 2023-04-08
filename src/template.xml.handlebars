@@ -15,26 +15,31 @@
   <CassettePort />
 
   <devices>
+    {{#each slots}}
+      {{#if isRom}}
+        <primary slot="{{n}}">
+          <ROM id="Temporary Machine">
+            <mem base="{{base}}" size="{{size}}" />
+            <rom>
+              <sha1>{{sha1}}</sha1>
+              <filename>{{rom_path}}</filename>
+            </rom>
+          </ROM>
+        </primary>
+      {{/if}}
 
-    <primary slot="0">
-      <ROM id="Temporary Machine">
-        <mem base="0x0000" size="0x8000" />
-        <rom>
-          <sha1>{sha1}</sha1>
-          <filename>{rom}</filename>
-        </rom>
-      </ROM>
-    </primary>
+      {{#if isEmpty}}
+        <primary external="true" slot="{{n}}" />
+      {{/if}}
 
-    <primary external="true" slot="1" />
-
-    <primary external="true" slot="2" />
-
-    <primary slot="3">
-      <RAM id="Main RAM">
-        <mem base="0x0000" size="0x10000" />
-      </RAM>
-    </primary>
+      {{#if isRam}}
+        <primary slot="{{n}}">
+          <RAM id="Main RAM">
+            <mem base="{{base}}" size="{{size}}" />
+          </RAM>
+        </primary>
+      {{/if}}
+    {{/each}}
 
     <PPI id="ppi">
       <io base="0xA8" num="4" />

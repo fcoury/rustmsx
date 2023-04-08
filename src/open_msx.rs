@@ -3,14 +3,16 @@ use std::io::{BufReader, BufWriter, Read, Write};
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::process::Command;
+use std::rc::Rc;
 use std::time::Instant;
 use std::{env, fs};
 
 use anyhow::{anyhow, bail, Error, Result};
+use handlebars::Handlebars;
+use msx::slot::Slot;
 use path_absolutize::*;
-use serde::Serialize;
+use serde_json::json;
 use sha1::{Digest, Sha1};
-use tinytemplate::TinyTemplate;
 use tracing::{event, span, Level};
 use walkdir::WalkDir;
 use xml::reader::{EventReader, XmlEvent};
@@ -67,12 +69,6 @@ impl ReportState for Client {
     }
 }
 
-#[derive(Serialize)]
-struct Machine {
-    rom: String,
-    sha1: String,
-}
-
 impl Drop for Client {
     fn drop(&mut self) {
         let _ = self.send("exit");
@@ -103,7 +99,7 @@ impl Client {
         }
     }
 
-    pub fn new(rom_path: PathBuf) -> Result<Client, Error> {
+    pub fn new(slots: &Vec<Rc<dyn Slot>>) -> Result<Client, Error> {
         let machine_xml = PathBuf::new()
             .join(dirs::home_dir().unwrap())
             .join(".openMsx")
@@ -111,24 +107,65 @@ impl Client {
             .join("machines")
             .join("RUNNER.xml");
 
-        let template = std::fs::read_to_string("src/template.xml.tt")?;
+        let template = std::fs::read_to_string("src/template.xml.handlebars")?;
 
-        let mut tt = TinyTemplate::new();
-        tt.add_template("machine", &template)?;
+        let json = serde_json::to_value(slots)?;
+        let mut slots = Vec::new();
+        for (n, slot) in json.as_array().unwrap().iter().enumerate() {
+            let slot = slot.as_object().unwrap();
+            let typ = slot.get("type").unwrap().as_str().unwrap();
+            match typ {
+                "RomSlot" => {
+                    let rom_path = slot.get("rom_path").unwrap().as_str().unwrap();
+                    let rom_path = PathBuf::from(rom_path);
+                    let file = File::open(&rom_path)?;
+                    let mut reader = BufReader::new(file);
+                    let mut buffer = Vec::new();
+                    reader.read_to_end(&mut buffer)?;
 
-        let file = File::open(&rom_path)?;
-        let mut reader = BufReader::new(file);
-        let mut buffer = Vec::new();
-        reader.read_to_end(&mut buffer)?;
+                    let mut hasher = Sha1::new();
+                    hasher.update(&buffer);
 
-        let mut hasher = Sha1::new();
-        hasher.update(&buffer);
-        let machine = Machine {
-            rom: rom_path.absolutize().unwrap().to_str().unwrap().to_string(),
-            sha1: format!("{:x}", hasher.finalize()),
-        };
+                    let base = slot.get("base").unwrap().as_i64().unwrap() as u16;
+                    let size = slot.get("size").unwrap().as_i64().unwrap() as u16;
 
-        fs::write(&machine_xml, tt.render("machine", &machine)?)?;
+                    slots.push(json!({
+                        "n": n,
+                        "isRom": true,
+                        "base": format!("0x{:04X}", base),
+                        "size": format!("0x{:04X}", size),
+                        "rom_path": rom_path.absolutize().unwrap().to_str().unwrap().to_string(),
+                        "sha1": format!("{:x}", hasher.finalize()),
+                    }));
+                }
+                "EmptySlot" => slots.push(json!({
+                    "n": n,
+                    "isEmpty": true,
+                })),
+                "RamSlot" => {
+                    let base = slot.get("base").unwrap().as_i64().unwrap() as u16;
+                    let size = slot.get("size").unwrap().as_i64().unwrap() as u32;
+
+                    slots.push(json!({
+                        "n": n,
+                        "isRam": true,
+                        "base": format!("0x{:04X}", base),
+                        "size": format!("0x{:05X}", size+1),
+                    }));
+                }
+                _ => {
+                    bail!("Unknown slot type: {}", typ);
+                }
+            }
+        }
+
+        let json = json!({
+            "slots": slots,
+        });
+        let reg = Handlebars::new();
+        let contents = reg.render_template(&template, &json).unwrap();
+
+        fs::write(&machine_xml, contents)?;
 
         let span = span!(Level::DEBUG, "Client::new");
         let _enter = span.enter();
