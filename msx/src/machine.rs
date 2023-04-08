@@ -1,7 +1,5 @@
 use std::{
     fmt,
-    fs::File,
-    io::Read,
     sync::{Arc, RwLock},
 };
 
@@ -9,7 +7,7 @@ use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bus::Bus, cpu::Z80, instruction::Instruction, memory::Memory, utils::hexdump, vdp::TMS9918,
+    bus::Bus, cpu::Z80, instruction::Instruction, slot::SlotType, utils::hexdump, vdp::TMS9918,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -53,9 +51,8 @@ pub struct Msx {
 impl Default for Msx {
     fn default() -> Self {
         println!("Initializing MSX...");
-        let bus = Arc::new(RwLock::new(Bus::new()));
-        let memory = Memory::new(bus.clone(), 64 * 1024);
-        let cpu = Z80::new(bus.clone(), memory);
+        let bus = Arc::new(RwLock::new(Bus::default()));
+        let cpu = Z80::new(bus.clone());
 
         Self {
             cpu,
@@ -74,8 +71,28 @@ impl Default for Msx {
 }
 
 impl Msx {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(slots: &[SlotType]) -> Self {
+        let bus = Arc::new(RwLock::new(Bus::new(slots)));
+        let cpu = Z80::new(bus.clone());
+
+        Self {
+            cpu,
+            bus,
+            current_scanline: 0,
+            max_cycles: None,
+            track_flags: false,
+            open_msx: false,
+            break_on_mismatch: false,
+            breakpoints: Vec::new(),
+            previous_memory: None,
+            memory_hash: 0,
+            running: false,
+        }
+    }
+
+    pub fn print_memory_page_info(&self) {
+        let bus = self.bus.read().unwrap();
+        bus.print_memory_page_info();
     }
 
     pub fn get_vdp(&self) -> TMS9918 {
@@ -84,11 +101,13 @@ impl Msx {
     }
 
     pub fn mem_size(&self) -> usize {
-        self.cpu.memory.size()
+        // FIXME self.cpu.memory.size()
+        64 * 1024
     }
 
     pub fn ram(&self) -> Vec<u8> {
-        self.cpu.memory.data.to_vec()
+        // self.cpu.memory.data.to_vec()
+        todo!()
     }
 
     pub fn vram(&self) -> Vec<u8> {
@@ -121,15 +140,15 @@ impl Msx {
     }
 
     pub fn set_hl_address(&mut self, value: u16) {
-        self.cpu.memory.write_word(self.cpu.get_hl(), value);
+        self.cpu.write_word(self.cpu.get_hl(), value);
     }
 
     pub fn set_memory(&mut self, address: u16, value: u8) {
-        self.cpu.memory.write_byte(address, value);
+        self.cpu.write_byte(address, value);
     }
 
     pub fn get_memory(&self, address: u16) -> u8 {
-        self.cpu.memory.read_byte(address)
+        self.cpu.read_byte(address)
     }
 
     pub fn add_breakpoint(&mut self, address: u16) {
@@ -137,7 +156,7 @@ impl Msx {
     }
 
     pub fn memory_dump(&mut self, start: u16, end: u16) -> String {
-        hexdump(&self.cpu.memory.data, start, end)
+        hexdump(&self.cpu.memory(), start, end)
     }
 
     pub fn vram_dump(&self) -> String {
@@ -146,25 +165,25 @@ impl Msx {
         hexdump(&vdp.vram, 0, 0x4000)
     }
 
-    pub fn load_binary(&mut self, path: &str) -> std::io::Result<()> {
-        let mut file = File::open(path)?;
-        let mut buffer = Vec::new();
-        file.read_to_end(&mut buffer)?;
+    // pub fn load_binary(&mut self, path: &str) -> std::io::Result<()> {
+    //     let mut file = File::open(path)?;
+    //     let mut buffer = Vec::new();
+    //     file.read_to_end(&mut buffer)?;
 
-        self.cpu.memory.load_bios(&buffer)?;
+    //     self.cpu.load_bios(&buffer)?;
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
 
-    pub fn load_rom(&mut self, rom: &[u8]) -> std::io::Result<()> {
-        self.reset();
-        self.cpu.memory.load_bios(rom)?;
+    // pub fn load_rom(&mut self, rom: &[u8]) -> std::io::Result<()> {
+    //     self.reset();
+    //     self.cpu.memory.load_bios(rom)?;
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
 
     pub fn instruction(&self) -> ProgramEntry {
-        let instr = Instruction::parse(&self.cpu.memory, self.cpu.pc);
+        let instr = Instruction::parse(&self.cpu);
         ProgramEntry {
             address: self.cpu.pc,
             instruction: instr.name(),
@@ -180,7 +199,7 @@ impl Msx {
         let program_end = program_start + size;
 
         for pc in program_start..program_end {
-            let instr = Instruction::parse(&self.cpu.memory, pc);
+            let instr = Instruction::parse(&self.cpu);
             program.push(ProgramEntry {
                 address: pc,
                 instruction: instr.name().to_string(),
@@ -204,7 +223,7 @@ impl Msx {
                 break;
             }
 
-            let instr = Instruction::parse(&self.cpu.memory, pc);
+            let instr = Instruction::parse(&self.cpu);
             program.push(ProgramEntry {
                 address: pc,
                 instruction: instr.name().to_string(),

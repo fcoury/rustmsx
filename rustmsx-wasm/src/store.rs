@@ -71,9 +71,10 @@ impl Reducer<ComputerState> for Msg {
             //     state.screen_buffer = new_buffer;
             // }
             Msg::LoadRom(data) => {
-                if let Err(e) = state.msx.borrow_mut().load_rom(&data) {
-                    state.error = Some(e.to_string());
-                }
+                // if let Err(e) = state.msx.borrow_mut().load_rom(&data) {
+                //     state.error = Some(e.to_string());
+                // }
+                todo!()
             }
         };
 

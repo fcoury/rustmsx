@@ -374,6 +374,10 @@ impl Runner {
             Command::Status => {
                 println!("Cycles: {}", self.cycles);
                 println!("Breakpoints: {:?}", self.breakpoints);
+                for (n, slot) in self.slots.iter().enumerate() {
+                    println!("Slot #{}: {}", n, slot);
+                }
+                self.msx.print_memory_page_info();
                 println!();
                 Ok(true)
             }
@@ -602,7 +606,7 @@ impl RunnerBuilder {
             track_flags: self.track_flags,
             running: false,
             client: None,
-            msx: Msx::new(),
+            msx: Msx::new(&self.slots),
             cycles: 0,
             instructions: MRUList::new(100),
         }

@@ -2,21 +2,21 @@ use std::fmt;
 
 use tracing::error;
 
-use super::memory::Memory;
+use crate::Z80;
 
-pub struct Instruction {
+pub struct Instruction<'a> {
     pub opcode: u8,
-    pub memory: Memory,
+    pub cpu: &'a Z80,
     pub pc: u16,
 }
 
-impl Instruction {
-    pub fn parse(memory: &Memory, pc: u16) -> Self {
-        let opcode = memory.read_byte(pc);
+impl<'a> Instruction<'a> {
+    pub fn parse(cpu: &'a Z80) -> Self {
+        let opcode = cpu.read_byte(cpu.pc);
         Instruction {
             opcode,
-            memory: memory.clone(),
-            pc,
+            cpu,
+            pc: cpu.pc,
         }
     }
 
@@ -28,7 +28,7 @@ impl Instruction {
             let mut i = 1;
             while name.contains(&format!("${}", i)) {
                 let pc = self.pc.wrapping_add(i);
-                let arg = self.memory.read_byte(pc);
+                let arg = self.cpu.read_byte(pc);
                 name = name.replace(&format!("${}", i), &format!("{:02X}", arg));
                 i += 1;
             }
@@ -52,7 +52,7 @@ impl Instruction {
         res.push(format!("{:02X}", self.opcode));
         for i in 1..length {
             let pc = self.pc.wrapping_add(i as u16);
-            let arg = self.memory.read_byte(pc);
+            let arg = self.cpu.read_byte(pc);
             res.push(format!("{:02X}", arg));
         }
         res
@@ -63,7 +63,7 @@ impl Instruction {
         let mut args = String::new();
         for i in 1..length {
             let pc = self.pc.wrapping_add(i as u16);
-            let arg = self.memory.read_byte(pc);
+            let arg = self.cpu.read_byte(pc);
             args.push_str(&format!("{:02X} ", arg));
         }
 
@@ -259,7 +259,7 @@ impl Instruction {
             0xFE => ("CP #$1", 2),
             0xBE => ("CP (HL)", 1),
             0xDD => {
-                let opcode = self.memory.read_byte(self.pc.wrapping_add(1));
+                let opcode = self.cpu.read_byte(self.pc.wrapping_add(1));
                 match opcode {
                     0xBE => ("CP (IX+d)", 4),
                     0x21 => ("LD IX, nn", 4),
@@ -272,7 +272,7 @@ impl Instruction {
                 }
             }
             0xFD => {
-                let opcode = self.memory.read_byte(self.pc.wrapping_add(1));
+                let opcode = self.cpu.read_byte(self.pc.wrapping_add(1));
                 match opcode {
                     0xBE => ("CP (IY+d)", 4),
                     0x22 => ("LD ($2$1), IY", 4),
@@ -327,7 +327,7 @@ impl Instruction {
             0x0F => ("RRCA", 1),
             0xCB => {
                 // Read extended opcode and execute it
-                let extended_opcode = self.memory.read_byte(self.pc.wrapping_add(1));
+                let extended_opcode = self.cpu.read_byte(self.pc.wrapping_add(1));
                 match extended_opcode {
                     0x00..=0x1F => ("RLC r", 2),
                     0x28..=0x2F => ("RR r", 2),
@@ -344,7 +344,7 @@ impl Instruction {
 
             // Extended opcodes
             0xED => {
-                let extended_opcode = self.memory.read_byte(self.pc.wrapping_add(1));
+                let extended_opcode = self.cpu.read_byte(self.pc.wrapping_add(1));
                 match extended_opcode {
                     0xB0 => ("LDIR", 2),
                     0x42 => ("SBC HL, BC", 2),
@@ -370,12 +370,12 @@ impl Instruction {
     }
 }
 
-impl fmt::Display for Instruction {
+impl<'a> fmt::Display for Instruction<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let (name, length) = self.as_def();
         let mut args = String::new();
         for i in 1..length {
-            let arg = self.memory.read_byte(self.pc + i as u16);
+            let arg = self.cpu.read_byte(self.pc + i as u16);
             args.push_str(&format!("{:02X} ", arg));
         }
 

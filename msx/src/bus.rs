@@ -44,8 +44,25 @@ impl Default for Bus {
 }
 
 impl Bus {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(slots: &[SlotType]) -> Self {
+        Self {
+            slot_count: 4,
+            vdp: TMS9918::new(),
+            psg: AY38910::new(),
+            ppi: Ppi::new(),
+            vdp_io_clock: 0,
+            primary_slot_config: 0x00,
+            slots: [
+                slots.get(0).unwrap().clone(),
+                slots.get(1).unwrap().clone(),
+                slots.get(2).unwrap().clone(),
+                slots.get(3).unwrap().clone(),
+            ],
+        }
+    }
+
+    pub fn mem_size(&self) -> usize {
+        0x10000
     }
 
     pub fn reset(&mut self) {
@@ -77,7 +94,7 @@ impl Bus {
         };
     }
 
-    pub fn read_byte(self, addr: u16) -> u8 {
+    pub fn read_byte(&self, addr: u16) -> u8 {
         let slot_number = self.get_slot_number_for_address(addr);
         self.slots[slot_number].read(addr)
     }
@@ -87,9 +104,36 @@ impl Bus {
         self.slots[slot_number].write(addr, data);
     }
 
+    pub fn write_word(&mut self, address: u16, value: u16) {
+        let low_byte = (value & 0x00FF) as u8;
+        let high_byte = ((value & 0xFF00) >> 8) as u8;
+        self.write_byte(address, low_byte);
+        self.write_byte(address + 1, high_byte);
+    }
+
+    pub fn read_word(&self, address: u16) -> u16 {
+        let low_byte = self.read_byte(address) as u16;
+        let high_byte = self.read_byte(address + 1) as u16;
+        (high_byte << 8) | low_byte
+    }
+
     fn get_slot_number_for_address(&self, addr: u16) -> usize {
         let page = (addr >> 14) & 0x03;
         let shift = page * 2;
         ((self.primary_slot_config >> shift) & 0x03) as usize
+    }
+
+    pub fn print_memory_page_info(&self) {
+        for page in 0..4 {
+            let start_address = page * 0x4000;
+            let end_address = start_address + 0x3FFF;
+            let slot_number = ((self.primary_slot_config >> (page * 2)) & 0x03) as usize;
+            let slot_type = self.slots.get(slot_number).unwrap();
+
+            println!(
+                "Memory page {} (0x{:04X} - 0x{:04X}): primary slot {} ({})",
+                page, start_address, end_address, slot_number, slot_type
+            );
+        }
     }
 }

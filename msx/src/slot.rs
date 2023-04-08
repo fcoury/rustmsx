@@ -1,4 +1,9 @@
-use std::{fmt::Debug, fs::File, io::Read, path::PathBuf};
+use std::{
+    fmt::{self, Debug},
+    fs::File,
+    io::Read,
+    path::PathBuf,
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -7,6 +12,20 @@ pub enum SlotType {
     Empty,
     Ram(RamSlot),
     Rom(RomSlot),
+}
+
+impl fmt::Display for SlotType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SlotType::Empty => write!(f, "Empty"),
+            SlotType::Ram(slot) => write!(f, "RAM base={:#06X} size={:#06X}", slot.base, slot.size),
+            SlotType::Rom(slot) => write!(
+                f,
+                "ROM path={:?} base={:#06X} size={:#06X}",
+                slot.rom_path, slot.base, slot.size
+            ),
+        }
+    }
 }
 
 impl SlotType {
@@ -73,11 +92,17 @@ impl RomSlot {
 impl Slot for RomSlot {
     fn read(&self, address: u16) -> u8 {
         let address = self.translate_address(address);
+        if (address as usize) >= self.data.len() {
+            return 0xFF;
+        }
         self.data[address as usize]
     }
 
     fn write(&mut self, address: u16, value: u8) {
         let address = self.translate_address(address);
+        if (address as usize) >= self.data.len() {
+            return;
+        }
         self.data[address as usize] = value;
     }
 }
@@ -104,11 +129,17 @@ impl RamSlot {
 impl Slot for RamSlot {
     fn read(&self, address: u16) -> u8 {
         let address = self.translate_address(address);
+        if (address as usize) >= self.data.len() {
+            return 0xFF;
+        }
         self.data[address as usize]
     }
 
     fn write(&mut self, address: u16, value: u8) {
         let address = self.translate_address(address);
+        if (address as usize) >= self.data.len() {
+            return;
+        }
         self.data[address as usize] = value;
     }
 }
