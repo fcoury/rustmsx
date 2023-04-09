@@ -283,8 +283,13 @@ impl Z80 {
                 trace!("RST 20H");
                 self.rst(0x20);
             }
+            0xEF => {
+                // RST 28H
+                trace!("RST 28H");
+                self.rst(0x28);
+            }
             0xFF => {
-                // RST 20H
+                // RST 38H
                 trace!("RST 38H from PC=0x{:04X}", self.pc);
                 self.rst(0x38);
             }
@@ -411,6 +416,12 @@ impl Z80 {
                 trace!("LD B, A");
                 self.pc = self.pc.wrapping_add(1);
                 self.b = self.a;
+            }
+            0x40 => {
+                // LD B, B
+                // As B is already B, this instruction effectively does nothing.
+                self.pc = self.pc.wrapping_add(1);
+                trace!("LD B, B");
             }
             0x41 => {
                 // LD B, C
@@ -821,6 +832,12 @@ impl Z80 {
                 self.set_hl(result);
                 self.pc = self.pc.wrapping_add(1);
             }
+            0x33 => {
+                // INC SP
+                self.sp = self.sp.wrapping_add(1);
+                self.pc = self.pc.wrapping_add(1);
+                trace!("INC SP");
+            }
             0x24 => {
                 // INC H
                 self.pc = self.pc.wrapping_add(1);
@@ -890,6 +907,7 @@ impl Z80 {
                 // DEC DE
                 let de = self.get_de().wrapping_sub(1);
                 self.set_de(de);
+                self.pc = self.pc.wrapping_add(1);
                 trace!("DEC DE");
             }
             0x35 => {
@@ -1700,6 +1718,20 @@ impl Z80 {
                     trace!("NOP (RET P not taken)");
                 }
             }
+            0xE0 => {
+                // RET PO
+                if !self.get_flag(Flag::P) {
+                    let low_byte = self.read_byte(self.sp);
+                    self.sp = self.sp.wrapping_add(1);
+                    let high_byte = self.read_byte(self.sp);
+                    self.sp = self.sp.wrapping_add(1);
+                    self.pc = u16::from_le_bytes([low_byte, high_byte]);
+                    trace!("RET PO");
+                } else {
+                    self.pc = self.pc.wrapping_add(1);
+                    trace!("NOP (RET PO not taken)");
+                }
+            }
             0xC5 => {
                 // PUSH BC
                 trace!("PUSH BC");
@@ -2037,7 +2069,32 @@ impl Z80 {
                 let extended_opcode = self.read_byte(self.pc);
 
                 match extended_opcode {
-                    0xB0 => self.ldi(),
+                    0xB0 => {
+                        // LDIR
+                        let mut count = self.get_bc();
+                        let mut src = self.get_hl();
+                        let mut dst = self.get_de();
+
+                        while count != 0 {
+                            let value = self.read_byte(src);
+                            self.write_byte(dst, value);
+
+                            src = src.wrapping_add(1);
+                            dst = dst.wrapping_add(1);
+                            count = count.wrapping_sub(1);
+                        }
+
+                        self.set_hl(src);
+                        self.set_de(dst);
+                        self.set_bc(count);
+
+                        self.set_flag(Flag::P, false);
+                        self.set_flag(Flag::H, false);
+                        self.set_flag(Flag::N, false);
+
+                        self.pc = self.pc.wrapping_add(1);
+                        trace!("LDIR");
+                    }
                     0x42 => {
                         // SBC HL, BC
                         let hl = self.get_hl();
@@ -2538,24 +2595,6 @@ impl Z80 {
         // info!("LD (BC), A | PC = #{:04X}", self.pc);
         let address = self.get_bc();
         self.write_byte(address, self.a);
-    }
-
-    fn ldi(&mut self) {
-        let src = self.get_hl();
-        let dest = self.get_de();
-        let value = self.read_byte(src);
-        // info!("LDI | PC = #{:04X}", self.pc);
-        self.write_byte(dest, value);
-
-        self.set_hl(src.wrapping_add(1));
-        self.set_de(dest.wrapping_add(1));
-        self.set_bc(self.get_bc().wrapping_sub(1));
-
-        // Set or reset the P/V flag based on the BC register value
-        self.set_flag(Flag::P, self.get_bc() != 0);
-
-        // Reset the N flag
-        self.set_flag(Flag::N, false);
     }
 
     fn inc_hl(&mut self) {

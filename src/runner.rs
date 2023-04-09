@@ -254,6 +254,10 @@ impl Runner {
         self.msx.step();
 
         if let Some(client) = &mut self.client {
+            let opcode = self.msx.cpu.read_byte(self.msx.pc());
+            if opcode == 0xED {
+                client.step()?;
+            }
             client.step()?;
         }
 
@@ -359,6 +363,7 @@ impl Runner {
                 Ok(true)
             }
             Command::Continue => {
+                self.max_cycles = None;
                 self.running = true;
                 Ok(false)
             }
