@@ -13,4 +13,5 @@ pub mod vdp;
 pub use cpu::Z80;
 pub use internal_state::{InternalState, ReportState};
 pub use machine::{Msx, ProgramEntry};
+pub use utils::compare_slices;
 pub use vdp::TMS9918;

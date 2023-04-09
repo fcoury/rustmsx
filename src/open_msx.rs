@@ -13,6 +13,7 @@ use msx::{InternalState, ReportState};
 use path_absolutize::*;
 use serde_json::json;
 use sha1::{Digest, Sha1};
+use tempfile::NamedTempFile;
 use tracing::{event, span, Level};
 use walkdir::WalkDir;
 use xml::reader::{EventReader, XmlEvent};
@@ -186,6 +187,25 @@ impl Client {
         self.send("set power on")?;
         self.send("reset")?;
         Ok(())
+    }
+
+    pub fn memory(&mut self, start: u16, end: u16) -> anyhow::Result<Vec<u8>> {
+        let temp_file = NamedTempFile::new()?;
+        let temp_path = temp_file.path().to_path_buf();
+
+        self.send(&format!(
+            "save_debuggable {{Main RAM}} {} {} {}",
+            temp_path.to_str().unwrap(),
+            start,
+            end as usize + 1
+        ))?;
+
+        // Read the temporary file as a slice of u8
+        let mut buffer = Vec::new();
+        let mut file = File::open(temp_path)?;
+        file.read_to_end(&mut buffer)?;
+
+        Ok(buffer)
     }
 
     pub fn memory_dump(&mut self, start: u16, end: u16) -> anyhow::Result<String> {

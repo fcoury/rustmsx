@@ -2,6 +2,7 @@ use std::{num::ParseIntError, path::PathBuf};
 
 use anyhow::{anyhow, bail};
 use msx::{
+    compare_slices,
     slot::{RamSlot, RomSlot, SlotType},
     Msx, ProgramEntry, ReportState,
 };
@@ -15,6 +16,7 @@ pub struct Runner {
     pub max_cycles: Option<u64>,
     pub open_msx: bool,
     pub break_on_mismatch: bool,
+    pub break_on_mem_mismatch: bool,
     pub log_on_mismatch: bool,
     pub track_flags: bool,
     pub report_every: Option<u64>,
@@ -190,7 +192,7 @@ impl Runner {
         let mut stop_next = false;
 
         loop {
-            self.step()?;
+            let mut stop = self.step()?;
 
             if let Some(report_every) = self.report_every {
                 if self.cycles % report_every == 0 {
@@ -199,7 +201,7 @@ impl Runner {
                 }
             }
 
-            let mut stop = !self.running;
+            stop = stop || !self.running;
 
             if let Some(client) = &mut self.client {
                 if self.break_on_mismatch || self.log_on_mismatch {
@@ -214,6 +216,25 @@ impl Runner {
                         if self.break_on_mismatch {
                             stop = true;
                         }
+                    }
+                }
+
+                if self.break_on_mem_mismatch {
+                    let start = 0u16;
+                    let end = (self.msx.mem_size() - 1) as u16;
+                    let msx_memory = self.msx.memory();
+                    let openmsx_memory = client.memory(start, end)?;
+
+                    if compare_slices(&msx_memory, &openmsx_memory).is_eq() {
+                        let msx_dump = self.msx.memory_dump(start, end);
+                        let openmsx_dump = client.memory_dump(start, end)?;
+
+                        println!("Memory mismatched at {:#06X}", self.msx.pc());
+                        println!();
+                        println!("Memory diff from {:#06X} to {:#06X}", start, end);
+                        println!("{}", self.diff(msx_dump, openmsx_dump));
+                        println!();
+                        stop = true;
                     }
                 }
             }
@@ -249,21 +270,25 @@ impl Runner {
         Ok(())
     }
 
-    pub fn step(&mut self) -> anyhow::Result<()> {
+    pub fn step(&mut self) -> anyhow::Result<bool> {
         self.instructions.push(self.msx.instruction());
         self.msx.step();
 
         if let Some(client) = &mut self.client {
-            let opcode = self.msx.cpu.read_byte(self.msx.pc());
-            if opcode == 0xED {
-                client.step()?;
-            }
+            // let opcode = self.msx.cpu.read_byte(self.msx.pc());
             client.step()?;
+            // if self.msx.cpu.read_byte(0xFFFF) == 0x00 {
+            //     println!(
+            //         "OpenMSX halted at {:#06X} with 0xFFFF = 0x00",
+            //         self.msx.pc()
+            //     );
+            //     return Ok(true);
+            // }
         }
 
         self.cycles += 1;
 
-        Ok(())
+        Ok(false)
     }
 
     pub fn at_breakpoint(&mut self) -> bool {
@@ -558,6 +583,7 @@ pub struct RunnerBuilder {
     max_cycles: Option<u64>,
     open_msx: bool,
     break_on_mismatch: bool,
+    break_on_mem_mismatch: bool,
     log_on_mismatch: bool,
     track_flags: bool,
     report_every: Option<u64>,
@@ -571,6 +597,7 @@ impl RunnerBuilder {
             max_cycles: None,
             open_msx: false,
             break_on_mismatch: false,
+            break_on_mem_mismatch: false,
             log_on_mismatch: false,
             track_flags: false,
             report_every: None,
@@ -594,6 +621,11 @@ impl RunnerBuilder {
 
     pub fn break_on_mismatch(&mut self, break_on_mismatch: bool) -> &mut Self {
         self.break_on_mismatch = break_on_mismatch;
+        self
+    }
+
+    pub fn break_on_mem_mismatch(&mut self, break_on_mem_mismatch: bool) -> &mut Self {
+        self.break_on_mem_mismatch = break_on_mem_mismatch;
         self
     }
 
@@ -640,6 +672,7 @@ impl RunnerBuilder {
             max_cycles: self.max_cycles,
             open_msx: self.open_msx,
             break_on_mismatch: self.break_on_mismatch,
+            break_on_mem_mismatch: self.break_on_mem_mismatch,
             log_on_mismatch: self.log_on_mismatch,
             track_flags: self.track_flags,
             report_every: self.report_every,

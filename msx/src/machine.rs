@@ -199,6 +199,10 @@ impl Msx {
         hexdump(&self.cpu.memory(), start, end)
     }
 
+    pub fn memory(&self) -> Vec<u8> {
+        self.cpu.memory()
+    }
+
     pub fn vram_dump(&self) -> String {
         let bus = self.bus.read().unwrap();
         let vdp = bus.vdp.clone();

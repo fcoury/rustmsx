@@ -28,3 +28,4 @@ tracing = "0.1.37"
 tracing-subscriber = {version = "0.3.16", features = ["env-filter"]}
 walkdir = "2.3.3"
 xml-rs = "0.8.4"
+tempfile = "3.5.0"

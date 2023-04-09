@@ -27,6 +27,9 @@ pub struct Cli {
     #[clap(short = 'm', long)]
     break_on_mismatch: bool,
 
+    #[clap(short = 'e', long)]
+    break_on_mem_mismatch: bool,
+
     #[clap(short, long)]
     log_on_mismatch: bool,
 
@@ -75,6 +78,7 @@ pub fn main() -> anyhow::Result<()> {
         .open_msx(cli.open_msx)
         .break_on_mismatch(cli.break_on_mismatch)
         .log_on_mismatch(cli.log_on_mismatch)
+        .break_on_mem_mismatch(cli.break_on_mem_mismatch)
         .report_every(cli.report_every)
         .build();
     runner.run()?;
