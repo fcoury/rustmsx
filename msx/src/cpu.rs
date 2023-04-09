@@ -2092,7 +2092,17 @@ impl Z80 {
                         self.set_flag(Flag::H, false);
                         self.set_flag(Flag::N, false);
 
-                        self.pc = self.pc.wrapping_add(1);
+                        // https://www.msx.org/forum/msx-talk/openmsx/ldir-takes-two-step-over-commands-to-go-to-next-instruction
+                        // The Z80 executes the LDIR instruction as: execute LDI, then if BC is not equal
+                        // to zero repeat the same instruction. With 'repeat' as in "do not increment PC".
+                        // This way the Z80 will re-fetch the same LDIR instruction from memory and
+                        // re-execute it. One important aspect of this implementation is that it allows to
+                        // serve interrupt request during execution of a (long) LDIR instruction.
+
+                        if self.get_bc() == 0 {
+                            self.pc = self.pc.wrapping_sub(1);
+                        }
+
                         trace!("LDIR");
                     }
                     0x42 => {
