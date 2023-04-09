@@ -104,12 +104,8 @@ impl Slot for RomSlot {
         self.data[address as usize]
     }
 
-    fn write(&mut self, address: u16, value: u8) {
-        let address = self.translate_address(address);
-        if (address as usize) >= self.data.len() {
-            return;
-        }
-        self.data[address as usize] = value;
+    fn write(&mut self, address: u16, _value: u8) {
+        tracing::trace!("Attempt to write to ROM address {:#06X}", address);
     }
 }
 
