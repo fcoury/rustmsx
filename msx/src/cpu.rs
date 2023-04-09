@@ -5,7 +5,7 @@ use std::{
 
 use derivative::Derivative;
 use serde::{Deserialize, Serialize};
-use tracing::{info, trace};
+use tracing::{error, info, trace};
 
 use super::bus::Bus;
 
@@ -227,7 +227,10 @@ impl Z80 {
         //     self.c,
         //     self.f
         // );
+        self.execute(opcode);
+    }
 
+    fn execute(&mut self, opcode: u8) {
         // Execute the instruction
         match opcode {
             0x00 => {
@@ -837,46 +840,39 @@ impl Z80 {
             }
             0x3D => {
                 // DEC A
+                self.a = self.dec(self.a);
                 self.pc = self.pc.wrapping_add(1);
-                self.a = self.a.wrapping_sub(1);
-                self.set_dec_flags(self.a);
             }
             0x05 => {
                 // DEC B
+                self.b = self.dec(self.b);
                 self.pc = self.pc.wrapping_add(1);
-                self.b = self.b.wrapping_sub(1);
-                self.set_dec_flags(self.b);
             }
             0x0D => {
                 // DEC C
+                self.c = self.dec(self.c);
                 self.pc = self.pc.wrapping_add(1);
-                self.c = self.c.wrapping_sub(1);
-                self.set_dec_flags(self.c);
             }
             0x15 => {
                 // DEC D
+                self.d = self.dec(self.d);
                 self.pc = self.pc.wrapping_add(1);
-                self.d = self.d.wrapping_sub(1);
-                self.set_dec_flags(self.d);
             }
             0x1D => {
                 // DEC E
+                self.e = self.dec(self.e);
                 self.pc = self.pc.wrapping_add(1);
-                self.e = self.e.wrapping_sub(1);
-                self.set_dec_flags(self.e);
             }
             0x25 => {
                 // DEC H
                 trace!("DEC H");
+                self.h = self.dec(self.h);
                 self.pc = self.pc.wrapping_add(1);
-                self.h = self.h.wrapping_sub(1);
-                self.set_dec_flags(self.h);
             }
             0x2D => {
                 // DEC L
+                self.l = self.dec(self.l);
                 self.pc = self.pc.wrapping_add(1);
-                self.l = self.l.wrapping_sub(1);
-                self.set_dec_flags(self.l);
             }
             0x2B => {
                 // DEC HL
@@ -1134,8 +1130,8 @@ impl Z80 {
             0x99 => {
                 // SBC A, C
                 trace!("SBC A, C");
-                self.pc = self.pc.wrapping_add(1);
                 self.sbc_a(self.c);
+                self.pc = self.pc.wrapping_add(1);
             }
             0x9A => {
                 // SBC A, D
@@ -1532,8 +1528,12 @@ impl Z80 {
                         self.iy = self.pop();
                         self.pc = self.pc.wrapping_add(1);
                     }
+                    0xAF => {}
                     _ => {
-                        panic!("Unknown opcode (CP (IY+d)) 0xFD 0x{:02X}", opcode);
+                        error!(
+                            "Unknown opcode at {:04X} (CP (IY+d)) 0xFD 0x{:02X}",
+                            self.pc, opcode
+                        );
                     }
                 }
             }
@@ -2238,19 +2238,26 @@ impl Z80 {
 
     fn sbc_a(&mut self, value: u8) {
         let carry = if self.get_flag(Flag::C) { 1 } else { 0 };
-        let result = self.a.wrapping_sub(value).wrapping_sub(carry);
+        let a = i16::from(self.a);
+        let d = i16::from(value);
+        let wans = a - d - carry;
+        let ans = (wans & 0xff) as u8;
 
-        self.set_flag(Flag::Z, result == 0);
-        self.set_flag(Flag::S, result & 0x80 != 0);
-        self.set_flag(Flag::H, (self.a & 0x0F) < (value & 0x0F) + carry);
-        self.set_flag(Flag::P, (self.a as i8) >= 0 && ((result as i8) < 0));
-        self.set_flag(Flag::N, true);
+        self.set_flag(Flag::S, ans & 0x80 != 0);
+        self.set_flag(Flag::Z, ans == 0);
+        self.set_flag(Flag::C, wans & 0x100 != 0);
+        self.set_flag(Flag::P, (self.a ^ value) & (self.a ^ ans) & 0x80 != 0);
         self.set_flag(
-            Flag::C,
-            self.a < value.checked_add(carry).unwrap_or(u8::MAX),
+            Flag::H,
+            (self.a & 0x0F)
+                .wrapping_sub(value & 0x0F)
+                .wrapping_sub(carry as u8)
+                & 0x10
+                != 0,
         );
+        self.set_flag(Flag::N, true);
 
-        self.a = result;
+        self.a = ans;
     }
 
     fn and_a(&mut self, value: u8) {
@@ -2290,11 +2297,13 @@ impl Z80 {
 
     fn cp(&mut self, value: u8) {
         let result = self.a.wrapping_sub(value);
+        let overflow = (self.a ^ value) & (self.a ^ result) & 0x80 != 0;
 
         self.set_flag(Flag::S, result & 0x80 != 0);
         self.set_flag(Flag::Z, result == 0);
         self.set_flag(Flag::H, (self.a & 0xF) < (value & 0xF));
-        self.set_flag(Flag::P, overflow_sub(self.a, value, result));
+        // self.set_flag(Flag::P, overflow_sub(self.a, value, result));
+        self.set_flag(Flag::P, overflow);
         self.set_flag(Flag::N, true);
         self.set_flag(Flag::C, self.a < value);
     }
@@ -2308,13 +2317,18 @@ impl Z80 {
         self.set_flag(Flag::N, false);
     }
 
-    // Helper function to set flags for DEC
-    fn set_dec_flags(&mut self, value: u8) {
-        self.set_flag(Flag::S, value & 0x80 != 0);
-        self.set_flag(Flag::Z, value == 0);
-        self.set_flag(Flag::H, (value & 0x0F) == 0x0F);
-        self.set_flag(Flag::P, value == 0x80);
+    fn dec(&mut self, value: u8) -> u8 {
+        let result = value.wrapping_sub(1);
+        let carry = (value & 0x0F) < (result & 0x0F);
+        let overflow = (value ^ result) & (value ^ 1) & 0x80 != 0;
+
+        self.set_flag(Flag::Z, result == 0);
+        self.set_flag(Flag::S, result & 0x80 != 0);
+        self.set_flag(Flag::H, carry);
+        self.set_flag(Flag::P, overflow);
         self.set_flag(Flag::N, true);
+
+        result
     }
 
     pub fn set_flag(&mut self, flag: Flag, value: bool) {
@@ -2560,8 +2574,6 @@ impl Z80 {
         let value = self.read_byte(hl);
         let result = value.wrapping_sub(1);
 
-        self.set_dec_flags(result);
-
         // info!("DEC HL | PC = #{:04X}", self.pc);
         self.write_byte(hl, result);
     }
@@ -2660,13 +2672,48 @@ impl Z80 {
     }
 }
 
-fn overflow_sub(a: u8, b: u8, result: u8) -> bool {
-    let signed_a = a as i8;
-    let signed_b = b as i8;
-    let signed_result = result as i8;
-    (((signed_a as u8) ^ (signed_b as u8)) & ((signed_a as u8) ^ (signed_result as u8))) & 0x80 != 0
-}
-
 fn parity(value: u8) -> bool {
     value.count_ones() % 2 == 0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sbc_set_c_flag_1() {
+        // 031A  9A          SBC A, D   - A: #C0 B: #00 C: #00 D: #C0 E: #00 H: #C0 L: #00 - HL: #C000(#FF) SP: #0000 - S: 0 Z: 1 H: 0 P/V: 0 N: 1 C: 0
+        // 031B  30 0A       JR NC, #0A - A: #00 B: #00 C: #00 D: #C0 E: #00 H: #C0 L: #00 - HL: #C000(#FF) SP: #0000 - S: 0 Z: 1 H: 0 P/V: 0 N: 1 C: 1
+
+        // #031A #9A - A: #C0 B: #00 C: #00 D: #C0 E: #00 H: #C0 L: #00 - HL: #C000(#FF) SP: #0000
+
+        // Emulator: SBC A, C0 -> 00 (carry = 0, carry4 = false, overflow = false)
+        //           SBC A, C0 -> 00 (carry = 0, carry4 = false, overflow = false)
+
+        let bus = Arc::new(RwLock::new(Bus::default()));
+        let mut cpu = Z80::new(bus);
+
+        cpu.f = 0x00;
+        cpu.a = 0xC0;
+        cpu.d = 0xC0;
+        cpu.set_hl(0xC000);
+        cpu.execute(0x9A);
+        assert!(!cpu.get_flag(Flag::C));
+    }
+
+    #[test]
+    fn test_sbc_set_c_flag_2() {
+        let bus = Arc::new(RwLock::new(Bus::default()));
+        let mut cpu = Z80::new(bus);
+
+        // #031B #30 - A: #C0 B: #00 C: #00 D: #FF E: #FF H: #C0 L: #00 - HL: #C000(#FF) SP: #FFFF - S: 1 Z: 0 H: 1 P/V: 0 N: 1 C: 0
+        // #031B #30 - A: #C0 B: #00 C: #00 D: #FF E: #FF H: #C0 L: #00 - HL: #C000(#FF) SP: #FFFF - S: 1 Z: 0 H: 1 P/V: 0 N: 1 C: 1
+
+        cpu.f = 0x00;
+        cpu.a = 0xC0;
+        cpu.d = 0xFF;
+        cpu.set_hl(0xC000);
+        cpu.execute(0x9A);
+        assert!(cpu.get_flag(Flag::C));
+    }
 }

@@ -13,6 +13,7 @@ use crate::{
     slot::SlotType,
     utils::hexdump,
     vdp::TMS9918,
+    InternalState, ReportState,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -20,14 +21,18 @@ pub struct ProgramEntry {
     pub address: u16,
     pub instruction: String,
     pub data: String,
+    pub dump: Option<String>,
 }
 
 impl fmt::Display for ProgramEntry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{:04X}  {:<10}  {}",
-            self.address, self.data, self.instruction
+            "{:04X}  {:<10}  {:<30} {}",
+            self.address,
+            self.data,
+            self.instruction,
+            self.dump.as_deref().unwrap_or("")
         )
     }
 }
@@ -72,6 +77,27 @@ impl Default for Msx {
             memory_hash: 0,
             running: false,
         }
+    }
+}
+
+impl ReportState for Msx {
+    fn report_state(&mut self) -> anyhow::Result<InternalState> {
+        let cpu = &self.cpu;
+        Ok(InternalState {
+            a: cpu.a,
+            f: cpu.f,
+            b: cpu.b,
+            c: cpu.c,
+            d: cpu.d,
+            e: cpu.e,
+            h: cpu.h,
+            l: cpu.l,
+            sp: cpu.sp,
+            pc: cpu.pc,
+            hl: cpu.get_hl(),
+            hl_contents: cpu.read_byte(cpu.get_hl()),
+            opcode: cpu.read_byte(cpu.pc),
+        })
     }
 }
 
@@ -196,12 +222,13 @@ impl Msx {
     //     Ok(())
     // }
 
-    pub fn instruction(&self) -> ProgramEntry {
+    pub fn instruction(&mut self) -> ProgramEntry {
         let instr = Instruction::parse(&self.cpu);
         ProgramEntry {
             address: self.cpu.pc,
             instruction: instr.name(),
             data: instr.opcode_with_args(),
+            dump: Some(format!("{}", self.report_state().unwrap())),
         }
     }
 
@@ -212,13 +239,16 @@ impl Msx {
         let program_start = pc.saturating_sub(before_pc);
         let program_end = program_start + size;
 
-        for pc in program_start..program_end {
+        let mut pc = program_start;
+        while pc <= program_end {
             let instr = Instruction::parse_at(&self.cpu, pc);
             program.push(ProgramEntry {
                 address: pc,
                 instruction: instr.name().to_string(),
                 data: instr.opcode_with_args(),
+                dump: None,
             });
+            pc += instr.len() as u16;
         }
 
         program
@@ -237,11 +267,12 @@ impl Msx {
                 break;
             }
 
-            let instr = Instruction::parse(&self.cpu);
+            let instr = Instruction::parse_at(&self.cpu, pc);
             program.push(ProgramEntry {
                 address: pc,
                 instruction: instr.name().to_string(),
                 data: instr.opcode_with_args(),
+                dump: None,
             });
             pc += instr.len() as u16;
         }

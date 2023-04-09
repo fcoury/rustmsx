@@ -280,6 +280,7 @@ impl<'a> Instruction<'a> {
                     0x2D => ("DEC IYL", 2),
                     0xE5 => ("PUSH IY", 2),
                     0xE1 => ("POP IY", 2),
+                    0xAF => ("XOR A", 2),
                     _ => {
                         error!("Unknown opcode (CP (IY+d)) 0xFD 0x{:02X}", opcode);
                         ("Unknown", 1)

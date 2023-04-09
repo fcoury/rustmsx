@@ -9,14 +9,13 @@ use std::{env, fs};
 use anyhow::{anyhow, bail, Error, Result};
 use handlebars::Handlebars;
 use msx::slot::SlotType;
+use msx::{InternalState, ReportState};
 use path_absolutize::*;
 use serde_json::json;
 use sha1::{Digest, Sha1};
 use tracing::{event, span, Level};
 use walkdir::WalkDir;
 use xml::reader::{EventReader, XmlEvent};
-
-use crate::internal_state::{InternalState, ReportState};
 
 pub enum Response {
     Ok(String),

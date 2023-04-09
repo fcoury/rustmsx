@@ -1,5 +1,7 @@
 use std::fmt;
 
+use crate::cpu::Flag;
+
 #[derive(Debug, Eq, PartialEq)]
 pub struct InternalState {
     // 8-bit registers
@@ -24,14 +26,15 @@ pub struct InternalState {
 
 impl fmt::Display for InternalState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let fv = self.f;
         let flags = format!(
             "S: {} Z: {} H: {} P/V: {} N: {} C: {}",
-            if self.f & 0b1000_0000 != 0 { "1" } else { "0" },
-            if self.f & 0b0100_0000 != 0 { "1" } else { "0" },
-            if self.f & 0b0001_0000 != 0 { "1" } else { "0" },
-            if self.f & 0b0000_0100 != 0 { "1" } else { "0" },
-            if self.f & 0b0000_0010 != 0 { "1" } else { "0" },
-            if self.f & 0b0000_0001 != 0 { "1" } else { "0" },
+            if fv & (Flag::S as u8) != 0 { "1" } else { "0" },
+            if fv & (Flag::Z as u8) != 0 { "1" } else { "0" },
+            if fv & (Flag::H as u8) != 0 { "1" } else { "0" },
+            if fv & (Flag::P as u8) != 0 { "1" } else { "0" },
+            if fv & (Flag::N as u8) != 0 { "1" } else { "0" },
+            if fv & (Flag::C as u8) != 0 { "1" } else { "0" },
         );
         // FIXME apparently the F3 and F5 registers are accounted for on the openMSX, we're skipping it for now
         // write!(

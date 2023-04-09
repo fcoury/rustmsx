@@ -14,7 +14,7 @@ mod store;
 fn main() {
     tracing_wasm::set_as_global_default_with_config(
         WASMLayerConfigBuilder::default()
-            .set_max_level(tracing::Level::INFO)
+            .set_max_level(tracing::Level::DEBUG)
             .build(),
     );
 

@@ -3,22 +3,19 @@ use std::{num::ParseIntError, path::PathBuf};
 use anyhow::{anyhow, bail};
 use msx::{
     slot::{RamSlot, RomSlot, SlotType},
-    Msx, ProgramEntry,
+    Msx, ProgramEntry, ReportState,
 };
 use rustyline::DefaultEditor;
 use similar::{ChangeTag, TextDiff};
 
-use crate::{
-    internal_state::{InternalState, ReportState},
-    mru::MRUList,
-    open_msx::Client,
-};
+use crate::{mru::MRUList, open_msx::Client};
 
 pub struct Runner {
     pub breakpoints: Vec<u16>,
     pub max_cycles: Option<u64>,
     pub open_msx: bool,
     pub break_on_mismatch: bool,
+    pub log_on_mismatch: bool,
     pub track_flags: bool,
     pub report_every: Option<u64>,
 
@@ -205,7 +202,7 @@ impl Runner {
             let mut stop = !self.running;
 
             if let Some(client) = &mut self.client {
-                if self.break_on_mismatch {
+                if self.break_on_mismatch || self.log_on_mismatch {
                     let msx_state = format!("{}", self.msx.report_state()?);
                     let open_msx_state = format!("{}", client.report_state()?);
 
@@ -214,7 +211,9 @@ impl Runner {
                         println!("{}", msx_state);
                         println!("{}", open_msx_state);
                         println!();
-                        stop = true;
+                        if self.break_on_mismatch {
+                            stop = true;
+                        }
                     }
                 }
             }
@@ -554,6 +553,7 @@ pub struct RunnerBuilder {
     max_cycles: Option<u64>,
     open_msx: bool,
     break_on_mismatch: bool,
+    log_on_mismatch: bool,
     track_flags: bool,
     report_every: Option<u64>,
 }
@@ -566,6 +566,7 @@ impl RunnerBuilder {
             max_cycles: None,
             open_msx: false,
             break_on_mismatch: false,
+            log_on_mismatch: false,
             track_flags: false,
             report_every: None,
         }
@@ -588,6 +589,11 @@ impl RunnerBuilder {
 
     pub fn break_on_mismatch(&mut self, break_on_mismatch: bool) -> &mut Self {
         self.break_on_mismatch = break_on_mismatch;
+        self
+    }
+
+    pub fn log_on_mismatch(&mut self, log_on_mismatch: bool) -> &mut Self {
+        self.log_on_mismatch = log_on_mismatch;
         self
     }
 
@@ -629,6 +635,7 @@ impl RunnerBuilder {
             max_cycles: self.max_cycles,
             open_msx: self.open_msx,
             break_on_mismatch: self.break_on_mismatch,
+            log_on_mismatch: self.log_on_mismatch,
             track_flags: self.track_flags,
             report_every: self.report_every,
             running: false,
@@ -637,26 +644,5 @@ impl RunnerBuilder {
             cycles: 0,
             instructions: MRUList::new(100),
         }
-    }
-}
-
-impl ReportState for Msx {
-    fn report_state(&mut self) -> anyhow::Result<InternalState> {
-        let cpu = &self.cpu;
-        Ok(InternalState {
-            a: cpu.a,
-            f: cpu.f,
-            b: cpu.b,
-            c: cpu.c,
-            d: cpu.d,
-            e: cpu.e,
-            h: cpu.h,
-            l: cpu.l,
-            sp: cpu.sp,
-            pc: cpu.pc,
-            hl: cpu.get_hl(),
-            hl_contents: cpu.read_byte(cpu.get_hl()),
-            opcode: cpu.read_byte(cpu.pc),
-        })
     }
 }

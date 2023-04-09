@@ -1,4 +1,3 @@
-mod internal_state;
 mod mru;
 mod open_msx;
 mod runner;
@@ -29,10 +28,16 @@ pub struct Cli {
     break_on_mismatch: bool,
 
     #[clap(short, long)]
+    log_on_mismatch: bool,
+
+    #[clap(short, long)]
     report_every: Option<u64>,
 
     #[clap(short, long)]
     debug: bool,
+
+    #[clap(long)]
+    debug_vdp: bool,
 
     #[clap(long)]
     debug_ppi: bool,
@@ -42,9 +47,10 @@ pub fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     let log_level = format!(
-        "msx_emulator={},msx::cpu=error,msx::vdp=error,msx::ppi={},info",
+        "msx_emulator={},msx::cpu=error,msx::vdp={},msx::ppi={},info",
         if cli.debug { "trace" } else { "info" },
-        if cli.debug_ppi { "trace" } else { "error" }
+        if cli.debug_vdp { "trace" } else { "error" },
+        if cli.debug_ppi { "trace" } else { "error" },
     );
     let subscriber = FmtSubscriber::builder()
         .with_env_filter(
@@ -68,6 +74,7 @@ pub fn main() -> anyhow::Result<()> {
         )
         .open_msx(cli.open_msx)
         .break_on_mismatch(cli.break_on_mismatch)
+        .log_on_mismatch(cli.log_on_mismatch)
         .report_every(cli.report_every)
         .build();
     runner.run()?;
