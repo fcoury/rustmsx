@@ -18,6 +18,7 @@ pub struct Runner {
     pub break_on_mismatch: bool,
     pub break_on_mem_mismatch: bool,
     pub break_on_ppi_write: bool,
+    pub break_on_halt: bool,
     pub log_on_mismatch: bool,
     pub track_flags: bool,
     pub report_every: Option<u64>,
@@ -246,6 +247,11 @@ impl Runner {
                 }
             }
 
+            if self.break_on_halt && self.msx.halted() {
+                println!("Halted at {:#06X}", self.msx.pc());
+                stop = true;
+            }
+
             if self.break_on_ppi_write && self.at_ppi_write() {
                 println!("PPI write at {:#06X}", self.msx.pc());
                 stop = true;
@@ -351,7 +357,8 @@ impl Runner {
     }
 
     pub fn log(&mut self) -> anyhow::Result<()> {
-        for instruction in self.instructions.iter() {
+        let instructions = self.instructions.iter().collect::<Vec<_>>();
+        for instruction in instructions.iter().rev() {
             println!("{}", instruction);
         }
 
@@ -604,6 +611,7 @@ pub struct RunnerBuilder {
     break_on_mismatch: bool,
     break_on_mem_mismatch: bool,
     break_on_ppi_write: bool,
+    break_on_halt: bool,
     log_on_mismatch: bool,
     track_flags: bool,
     report_every: Option<u64>,
@@ -619,6 +627,7 @@ impl RunnerBuilder {
             break_on_mismatch: false,
             break_on_mem_mismatch: false,
             break_on_ppi_write: false,
+            break_on_halt: false,
             log_on_mismatch: false,
             track_flags: false,
             report_every: None,
@@ -655,6 +664,11 @@ impl RunnerBuilder {
         self
     }
 
+    pub fn break_on_halt(&mut self, break_on_halt: bool) -> &mut Self {
+        self.break_on_halt = break_on_halt;
+        self
+    }
+
     pub fn log_on_mismatch(&mut self, log_on_mismatch: bool) -> &mut Self {
         self.log_on_mismatch = log_on_mismatch;
         self
@@ -670,7 +684,7 @@ impl RunnerBuilder {
         self
     }
 
-    pub fn ram_slot(&mut self, base: u16, size: u16) -> &mut Self {
+    pub fn ram_slot(&mut self, base: u16, size: u32) -> &mut Self {
         self.slots.push(SlotType::Ram(RamSlot::new(base, size)));
         self
     }
@@ -679,7 +693,7 @@ impl RunnerBuilder {
         &mut self,
         rom_path: PathBuf,
         base: u16,
-        size: u16,
+        size: u32,
     ) -> anyhow::Result<&mut Self> {
         self.slots
             .push(SlotType::Rom(RomSlot::load(rom_path, base, size)?));
@@ -700,6 +714,7 @@ impl RunnerBuilder {
             break_on_mismatch: self.break_on_mismatch,
             break_on_mem_mismatch: self.break_on_mem_mismatch,
             break_on_ppi_write: self.break_on_ppi_write,
+            break_on_halt: self.break_on_halt,
             log_on_mismatch: self.log_on_mismatch,
             track_flags: self.track_flags,
             report_every: self.report_every,

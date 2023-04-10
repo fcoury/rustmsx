@@ -30,6 +30,9 @@ pub struct Cli {
     #[clap(short = 'e', long)]
     break_on_mem_mismatch: bool,
 
+    #[clap(long)]
+    break_on_halt: bool,
+
     #[clap(short, long)]
     log_on_mismatch: bool,
 
@@ -66,10 +69,12 @@ pub fn main() -> anyhow::Result<()> {
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
     let mut runner = RunnerBuilder::new()
-        .rom_slot_from_file(cli.rom_path, 0x0000, 0x8000)?
+        .rom_slot_from_file(cli.rom_path, 0x0000, 0xC000)?
+        // .ram_slot(0x0000, 0xFFFF)
+        // .ram_slot(0x0000, 0xFFFF)
         .empty_slot()
         .empty_slot()
-        .ram_slot(0x0000, 0xFFFF)
+        .ram_slot(0x0000, 0x10000)
         .max_cycles(cli.max_cycles)
         .track_flags(cli.track_flags)
         .breakpoints(
@@ -83,6 +88,7 @@ pub fn main() -> anyhow::Result<()> {
         .log_on_mismatch(cli.log_on_mismatch)
         .break_on_mem_mismatch(cli.break_on_mem_mismatch)
         .break_on_ppi_write(cli.break_on_ppi_write)
+        .break_on_halt(cli.break_on_halt)
         .report_every(cli.report_every)
         .build();
     runner.run()?;

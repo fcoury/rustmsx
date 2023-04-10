@@ -73,6 +73,8 @@ impl Reducer<ComputerState> for Msg {
             Msg::LoadRom(data) => {
                 let mut msx = state.msx.borrow_mut();
                 msx.load_rom(0, &data);
+                msx.load_empty(1);
+                msx.load_empty(2);
                 msx.load_ram(3);
             }
         };

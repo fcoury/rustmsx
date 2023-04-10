@@ -1397,7 +1397,7 @@ impl Z80 {
             }
             0x76 => {
                 // HALT
-                trace!("HALT");
+                println!("HALT from 0x{:04X}", self.pc);
                 self.pc = self.pc.wrapping_add(1);
                 self.halted = true;
             }
@@ -1778,21 +1778,18 @@ impl Z80 {
             0xC1 => {
                 // POP BC
                 trace!("POP BC");
-                self.pc = self.pc.wrapping_add(1);
                 let value = self.pop();
                 self.set_bc(value);
                 self.pc = self.pc.wrapping_add(1);
             }
             0xD1 => {
                 // POP DE
-                self.pc = self.pc.wrapping_add(1);
                 let value = self.pop();
                 self.set_de(value);
                 self.pc = self.pc.wrapping_add(1);
             }
             0xE1 => {
                 // POP HL
-                self.pc = self.pc.wrapping_add(1);
                 let value = self.pop();
                 self.set_hl(value);
                 self.pc = self.pc.wrapping_add(1);
@@ -1800,10 +1797,10 @@ impl Z80 {
             0xF1 => {
                 // POP AF
                 trace!("POP AF");
-                self.pc = self.pc.wrapping_add(1);
                 let value = self.pop();
                 self.set_af(value);
                 self.pc = self.pc.wrapping_add(1);
+                self.set_flag(Flag::Z, self.a == 0);
             }
             0xF2 => {
                 // JP P, nn
@@ -2199,6 +2196,29 @@ impl Z80 {
                         self.pc = self.pc.wrapping_add(1);
                         trace!("OUT (C), D");
                     }
+                    0x58 => {
+                        let port = self.c;
+                        let value = self.write_bus().input(port);
+                        self.e = value;
+
+                        // Set/reset flags
+                        self.set_flag(Flag::S, (value & 0x80) != 0);
+                        self.set_flag(Flag::Z, value == 0);
+                        self.set_flag(Flag::H, false);
+                        self.set_flag(Flag::P, value.count_ones() % 2 == 0);
+                        self.set_flag(Flag::N, false);
+
+                        self.pc = self.pc.wrapping_add(1);
+                        trace!("IN (C), E");
+                    }
+                    0x5B => {
+                        // LD DE, (nn)
+                        let address = self.read_word(self.pc.wrapping_add(1));
+                        let value = self.read_word(address);
+                        self.set_de(value);
+                        self.pc = self.pc.wrapping_add(3);
+                        trace!("LD DE, (nn)");
+                    }
                     // Add extended opcodes handling here
                     // 0x4A => self.sbc_hl(RegisterPair::BC),
                     // 0x5A => self.sbc_hl(RegisterPair::DE),
@@ -2206,7 +2226,10 @@ impl Z80 {
                     // 0x7A => self.sbc_hl(RegisterPair::SP),
                     // ... (other opcodes)
                     _ => {
-                        self.report_unknown("Unhandled extended opcode", opcode);
+                        self.report_unknown(
+                            &format!("Unhandled extended ED opcode {:#X}", opcode),
+                            extended_opcode,
+                        );
                     }
                 }
             }

@@ -153,8 +153,9 @@ impl Bus {
         let segments = self.memory_segments();
         for segment in &segments {
             if address >= segment.start && address <= segment.end {
-                let relative_address = address - segment.start + segment.base;
-                return (segment.slot as usize, relative_address);
+                return (segment.slot as usize, address);
+                // let relative_address = address - segment.start + segment.base;
+                // return (segment.slot as usize, relative_address);
             }
         }
 
@@ -221,11 +222,15 @@ impl Bus {
     }
 
     pub fn load_rom(&mut self, slot: u8, rom: &[u8]) {
-        self.slots[slot as usize] = SlotType::Rom(RomSlot::new(rom, 0x0000, 0x8000));
+        self.slots[slot as usize] = SlotType::Rom(RomSlot::new(rom, 0x0000, rom.len() as u32));
     }
 
     pub fn load_ram(&mut self, slot: u8) {
-        self.slots[slot as usize] = SlotType::Ram(RamSlot::new(0x0000, 0xFFFF));
+        self.slots[slot as usize] = SlotType::Ram(RamSlot::new(0x0000, 0x10000));
+    }
+
+    pub fn load_empty(&mut self, slot: u8) {
+        self.slots[slot as usize] = SlotType::Empty;
     }
 }
 
@@ -241,7 +246,7 @@ mod tests {
             SlotType::Rom(RomSlot::new(&[0; 0x8000], 0x0000, 0x8000)),
             SlotType::Empty,
             SlotType::Empty,
-            SlotType::Ram(RamSlot::new(0x0000, 0xFFFF)),
+            SlotType::Ram(RamSlot::new(0x0000, 0x10000)),
         ]);
 
         bus.ppi.primary_slot_config = 0b00_11_00_00;

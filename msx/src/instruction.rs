@@ -358,6 +358,8 @@ impl<'a> Instruction<'a> {
                     0xA2 => ("INI", 2),
                     0xA3 => ("OUTI", 2),
                     0x51 => ("OUT (C), D", 2),
+                    0x58 => ("OUT (C), E", 2),
+                    0x5B => ("LD DE, ($2$1)", 4),
                     _ => {
                         error!("Unknown opcode (ED) 0xED 0x{:02X}", extended_opcode);
                         ("Unknown", 1)

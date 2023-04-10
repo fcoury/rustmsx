@@ -45,7 +45,7 @@ impl SlotType {
         }
     }
 
-    pub fn size(&self) -> u16 {
+    pub fn size(&self) -> u32 {
         match self {
             SlotType::Empty => 0,
             SlotType::Ram(slot) => slot.size,
@@ -63,12 +63,12 @@ pub trait Slot: Debug {
 pub struct RomSlot {
     pub rom_path: Option<PathBuf>,
     pub base: u16,
-    pub size: u16,
+    pub size: u32,
     pub data: Vec<u8>,
 }
 
 impl RomSlot {
-    pub fn new(rom: &[u8], base: u16, size: u16) -> Self {
+    pub fn new(rom: &[u8], base: u16, size: u32) -> Self {
         let mut data = vec![0xFF; size as usize];
         data[0..rom.len()].copy_from_slice(rom);
         RomSlot {
@@ -79,7 +79,7 @@ impl RomSlot {
         }
     }
 
-    pub fn load(rom_path: PathBuf, base: u16, size: u16) -> anyhow::Result<Self> {
+    pub fn load(rom_path: PathBuf, base: u16, size: u32) -> anyhow::Result<Self> {
         let mut file = File::open(&rom_path)?;
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer)?;
@@ -99,6 +99,10 @@ impl Slot for RomSlot {
     fn read(&self, address: u16) -> u8 {
         let address = self.translate_address(address);
         if (address as usize) >= self.data.len() {
+            // tracing::warn!(
+            //     "Attempt to read from out of bounds ROM address {:#06X}, returning 0xFF",
+            //     address
+            // );
             return 0xFF;
         }
         self.data[address as usize]
@@ -112,12 +116,12 @@ impl Slot for RomSlot {
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq, Clone)]
 pub struct RamSlot {
     pub base: u16,
-    pub size: u16,
+    pub size: u32,
     pub data: Vec<u8>,
 }
 
 impl RamSlot {
-    pub fn new(base: u16, size: u16) -> Self {
+    pub fn new(base: u16, size: u32) -> Self {
         let data = vec![0xFF; size as usize];
         RamSlot { base, data, size }
     }
@@ -131,6 +135,10 @@ impl Slot for RamSlot {
     fn read(&self, address: u16) -> u8 {
         let address = self.translate_address(address);
         if (address as usize) >= self.data.len() {
+            tracing::warn!(
+                "Attempt to read from out of bounds RAM address {:#06X}, returning 0xFF",
+                address
+            );
             return 0xFF;
         }
         self.data[address as usize]

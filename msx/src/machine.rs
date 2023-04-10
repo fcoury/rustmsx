@@ -28,7 +28,7 @@ impl fmt::Display for ProgramEntry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{:04X}  {:<10}  {:<30} {}",
+            "{:04X}  {:<12}  {:<20} {}",
             self.address,
             self.data,
             self.instruction,
@@ -130,6 +130,11 @@ impl Msx {
     pub fn load_ram(&mut self, slot: u8) {
         let mut bus = self.bus.write().unwrap();
         bus.load_ram(slot);
+    }
+
+    pub fn load_empty(&mut self, slot: u8) {
+        let mut bus = self.bus.write().unwrap();
+        bus.load_empty(slot);
     }
 
     pub fn print_memory_page_info(&self) {

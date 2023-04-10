@@ -141,7 +141,7 @@ impl Client {
                     "n": n,
                     "isRam": true,
                     "base": format!("0x{:04X}", slot.base),
-                    "size": format!("0x{:05X}", slot.size as u32 + 1),
+                    "size": format!("0x{:05X}", slot.size),
                 })),
             })
             .collect();

@@ -1,0 +1,31 @@
+{
+  "name": "cbios-msx1",
+  "slots": [
+    {
+      "type": "rom",
+      "contents": [
+        {
+          "base": "0x0000",
+          "size": "0x8000",
+          "file": "cbios_main_msx1.rom"
+        },
+        {
+          "base": "0x8000",
+          "size": "0x4000",
+          "file": "cbios_logo_msx1.rom"
+        }
+      ]
+    },
+    {
+      "type": "empty"
+    },
+    {
+      "type": "empty"
+    },
+    {
+      "type": "ram",
+      "base": "0x4000",
+      "size": "0x10000"
+    }
+  ]
+}
