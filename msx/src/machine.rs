@@ -294,4 +294,13 @@ impl Msx {
         let bus = self.bus.read().unwrap();
         bus.memory_segments()
     }
+
+    pub fn wrote_to_ppi(&self) -> bool {
+        let mut bus = self.bus.write().unwrap();
+        bus.wrote_to_ppi()
+    }
+
+    // pub fn is_at_instruction(&self, opcode: u8) -> bool {
+    //     self.cpu.memory()[self.cpu.pc as usize] == opcode
+    // }
 }

@@ -17,6 +17,7 @@ pub struct Runner {
     pub open_msx: bool,
     pub break_on_mismatch: bool,
     pub break_on_mem_mismatch: bool,
+    pub break_on_ppi_write: bool,
     pub log_on_mismatch: bool,
     pub track_flags: bool,
     pub report_every: Option<u64>,
@@ -51,7 +52,7 @@ enum Command {
     Reset,
 
     /// steps one instruction on all emulators
-    Step,
+    Step(u32),
 
     /// continues execution on all emulators
     Continue,
@@ -113,7 +114,13 @@ impl CommandLine {
 
         let command = match parts.next() {
             Some("quit") | Some("q") => Command::Quit,
-            Some("step") | Some("n") => Command::Step,
+            Some("step") | Some("n") => {
+                let n = match parts.next() {
+                    Some(n) => n.parse()?,
+                    None => 1,
+                };
+                Command::Step(n)
+            }
             Some("cont") | Some("c") => Command::Continue,
             Some("reset") => Command::Reset,
             Some("list") | Some("l") => Command::List,
@@ -239,6 +246,11 @@ impl Runner {
                 }
             }
 
+            if self.break_on_ppi_write && self.at_ppi_write() {
+                println!("PPI write at {:#06X}", self.msx.pc());
+                stop = true;
+            }
+
             if self.at_breakpoint() {
                 println!("Breakpoint hit at {:#06X}", self.msx.pc());
                 stop = true;
@@ -289,6 +301,10 @@ impl Runner {
         self.cycles += 1;
 
         Ok(false)
+    }
+
+    pub fn at_ppi_write(&mut self) -> bool {
+        self.msx.wrote_to_ppi()
     }
 
     pub fn at_breakpoint(&mut self) -> bool {
@@ -383,8 +399,10 @@ impl Runner {
                 self.running = false;
                 Ok(false)
             }
-            Command::Step => {
-                self.step()?;
+            Command::Step(n) => {
+                for _ in 0..n {
+                    self.step()?;
+                }
                 self.dump()?;
                 Ok(true)
             }
@@ -585,6 +603,7 @@ pub struct RunnerBuilder {
     open_msx: bool,
     break_on_mismatch: bool,
     break_on_mem_mismatch: bool,
+    break_on_ppi_write: bool,
     log_on_mismatch: bool,
     track_flags: bool,
     report_every: Option<u64>,
@@ -599,6 +618,7 @@ impl RunnerBuilder {
             open_msx: false,
             break_on_mismatch: false,
             break_on_mem_mismatch: false,
+            break_on_ppi_write: false,
             log_on_mismatch: false,
             track_flags: false,
             report_every: None,
@@ -627,6 +647,11 @@ impl RunnerBuilder {
 
     pub fn break_on_mem_mismatch(&mut self, break_on_mem_mismatch: bool) -> &mut Self {
         self.break_on_mem_mismatch = break_on_mem_mismatch;
+        self
+    }
+
+    pub fn break_on_ppi_write(&mut self, break_on_ppi_write: bool) -> &mut Self {
+        self.break_on_ppi_write = break_on_ppi_write;
         self
     }
 
@@ -674,6 +699,7 @@ impl RunnerBuilder {
             open_msx: self.open_msx,
             break_on_mismatch: self.break_on_mismatch,
             break_on_mem_mismatch: self.break_on_mem_mismatch,
+            break_on_ppi_write: self.break_on_ppi_write,
             log_on_mismatch: self.log_on_mismatch,
             track_flags: self.track_flags,
             report_every: self.report_every,

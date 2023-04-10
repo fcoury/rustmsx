@@ -37,6 +37,8 @@ pub struct Bus {
 
     vdp_io_clock: u8,
     slots: [SlotType; 4],
+
+    wrote_to_ppi: bool,
 }
 
 impl Default for Bus {
@@ -55,6 +57,7 @@ impl Default for Bus {
                 SlotType::Empty,
                 SlotType::Empty,
             ],
+            wrote_to_ppi: false,
         }
     }
 }
@@ -73,6 +76,7 @@ impl Bus {
                 slots.get(2).unwrap().clone(),
                 slots.get(3).unwrap().clone(),
             ],
+            wrote_to_ppi: false,
         }
     }
 
@@ -102,11 +106,20 @@ impl Bus {
         match port {
             0x98 | 0x99 => self.vdp.write(port, data),
             0xA0 | 0xA1 => self.psg.write(port, data),
-            0xA8 | 0xA9 | 0xAA | 0xAB => self.ppi.write(port, data),
+            0xA8 | 0xA9 | 0xAA | 0xAB => {
+                self.wrote_to_ppi = true;
+                self.ppi.write(port, data);
+            }
             _ => {
                 error!("[BUS] Invalid port {:02X} write", port);
             }
         };
+    }
+
+    pub fn wrote_to_ppi(&mut self) -> bool {
+        let wrote_to_ppi = self.wrote_to_ppi;
+        self.wrote_to_ppi = false;
+        wrote_to_ppi
     }
 
     pub fn read_byte(&self, addr: u16) -> u8 {

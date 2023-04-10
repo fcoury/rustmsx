@@ -36,6 +36,9 @@ pub struct Cli {
     #[clap(short, long)]
     report_every: Option<u64>,
 
+    #[clap(short = 'p', long)]
+    break_on_ppi_write: bool,
+
     #[clap(short, long)]
     debug: bool,
 
@@ -79,6 +82,7 @@ pub fn main() -> anyhow::Result<()> {
         .break_on_mismatch(cli.break_on_mismatch)
         .log_on_mismatch(cli.log_on_mismatch)
         .break_on_mem_mismatch(cli.break_on_mem_mismatch)
+        .break_on_ppi_write(cli.break_on_ppi_write)
         .report_every(cli.report_every)
         .build();
     runner.run()?;
