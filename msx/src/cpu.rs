@@ -1616,12 +1616,24 @@ impl Z80 {
             0xCC => {
                 // CALL Z, nn
                 let address = self.read_word(self.pc.wrapping_add(1));
+                self.pc = self.pc.wrapping_add(3);
+
                 if self.get_flag(Flag::Z) {
-                    self.push(self.pc.wrapping_add(3));
+                    self.push(self.pc);
                     self.pc = address;
-                } else {
-                    self.pc = self.pc.wrapping_add(3);
                 }
+            }
+            0xC4 => {
+                // CALL NZ, nn
+                let address = self.read_word(self.pc.wrapping_add(1));
+                self.pc = self.pc.wrapping_add(3);
+
+                if !self.get_flag(Flag::Z) {
+                    self.push(self.pc);
+                    self.pc = address;
+                }
+
+                trace!("CALL NZ, 0x{:04X}", address);
             }
             0xDC => {
                 // CALL C, nn
@@ -1655,7 +1667,7 @@ impl Z80 {
                 let high_byte = self.read_byte(self.pc.wrapping_add(2));
                 let target_address = u16::from_le_bytes([low_byte, high_byte]);
 
-                info!("#{:04X} - CALL {:04X}", self.pc, target_address);
+                // info!("#{:04X} - CALL {:04X}", self.pc, target_address);
 
                 self.push(self.pc.wrapping_add(3));
                 self.pc = target_address;
@@ -2046,12 +2058,12 @@ impl Z80 {
                 let port = self.read_byte(self.pc.wrapping_add(1));
                 let data = self.a;
 
-                if port >= 0x90 {
-                    info!(
-                        "PC = #{:04X} OUT (n), A | Port = #{:02X} | Data = 0x{:02X}",
-                        self.pc, port, data
-                    );
-                }
+                // if port >= 0x90 {
+                info!(
+                    "PC = #{:04X} OUT (n), A | Port = #{:02X} | Data = 0x{:02X}",
+                    self.pc, port, data
+                );
+                // }
 
                 {
                     let mut bus = self
@@ -2071,27 +2083,7 @@ impl Z80 {
                 match extended_opcode {
                     0xB0 => {
                         // LDIR
-                        let mut count = self.get_bc();
-                        let mut src = self.get_hl();
-                        let mut dst = self.get_de();
-
-                        while count != 0 {
-                            let value = self.read_byte(src);
-                            self.write_byte(dst, value);
-
-                            src = src.wrapping_add(1);
-                            dst = dst.wrapping_add(1);
-                            count = count.wrapping_sub(1);
-                        }
-
-                        self.set_hl(src);
-                        self.set_de(dst);
-                        self.set_bc(count);
-
-                        self.set_flag(Flag::P, false);
-                        self.set_flag(Flag::H, false);
-                        self.set_flag(Flag::N, false);
-
+                        //
                         // https://www.msx.org/forum/msx-talk/openmsx/ldir-takes-two-step-over-commands-to-go-to-next-instruction
                         // The Z80 executes the LDIR instruction as: execute LDI, then if BC is not equal
                         // to zero repeat the same instruction. With 'repeat' as in "do not increment PC".
@@ -2099,11 +2091,23 @@ impl Z80 {
                         // re-execute it. One important aspect of this implementation is that it allows to
                         // serve interrupt request during execution of a (long) LDIR instruction.
 
-                        if self.get_bc() == 0 {
-                            self.pc = self.pc.wrapping_sub(1);
+                        let value = self.read_byte(self.get_hl());
+                        self.write_byte(self.get_de(), value);
+                        self.set_hl(self.get_hl().wrapping_add(1));
+                        self.set_de(self.get_de().wrapping_add(1));
+                        self.set_bc(self.get_bc().wrapping_sub(1));
+                        trace!("LDIR");
+
+                        if self.get_bc() == 0x0C48 {
+                            self.set_flag(Flag::P, true);
                         }
 
-                        trace!("LDIR");
+                        if self.get_bc() == 0 {
+                            self.set_flag(Flag::P, false); // Reset P/V flag
+                            self.pc = self.pc.wrapping_add(1);
+                        } else {
+                            self.pc = self.pc.wrapping_sub(1);
+                        }
                     }
                     0x42 => {
                         // SBC HL, BC
@@ -2146,15 +2150,15 @@ impl Z80 {
                         let value = self.read_byte(self.get_hl());
                         let port = self.c;
 
-                        if port >= 0x90 {
-                            info!(
-                                "PC = #{:04X} OUTI | HL (0x{:04X}) | Port = #{:02X} | Data = 0x{:02X}",
-                                self.pc,
-                                self.get_hl(),
-                                port,
-                                value
-                            );
-                        }
+                        // if port >= 0x90 {
+                        info!(
+                            "PC = #{:04X} OUTI | HL (0x{:04X}) | Port = #{:02X} | Data = 0x{:02X}",
+                            self.pc,
+                            self.get_hl(),
+                            port,
+                            value
+                        );
+                        // }
 
                         {
                             let mut bus = self
@@ -2175,12 +2179,12 @@ impl Z80 {
                         let port = self.c;
                         let value = self.d;
 
-                        if port >= 0x90 {
-                            info!(
-                                "PC = #{:04X} OUT (C), D | Port = #{:02X} | Data = 0x{:02X}",
-                                self.pc, port, value
-                            );
-                        }
+                        // if port >= 0x90 {
+                        info!(
+                            "PC = #{:04X} OUT (C), D | Port = #{:02X} | Data = 0x{:02X}",
+                            self.pc, port, value
+                        );
+                        // }
 
                         {
                             let mut bus = self
@@ -2350,11 +2354,8 @@ impl Z80 {
     }
 
     fn xor_a(&mut self, value: u8) {
-        info!("XOR A, {:02X}", value);
         self.a ^= value;
-        info!("Z[b] = {}", self.a == 0);
         self.set_flag(Flag::Z, self.a == 0);
-        info!("Z[a] = {}", self.get_flag(Flag::Z));
         self.set_flag(Flag::S, self.a & 0x80 != 0);
         self.set_flag(Flag::H, false);
         self.set_flag(Flag::P, parity(self.a));

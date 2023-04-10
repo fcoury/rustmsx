@@ -297,6 +297,7 @@ impl<'a> Instruction<'a> {
             0x08 => ("EX AF, AF'", 1),
             0xD9 => ("EXX", 1),
             0xCC => ("CALL Z, #$2$1", 3),
+            0xC4 => ("CALL NZ, #$2$1", 3),
             0xDC => ("CALL C, #$2$1", 3),
             0xFC => ("CALL M, #$2$1", 3),
             0xCD => ("CALL #$2$1", 3),
