@@ -186,61 +186,68 @@ impl TMS9918 {
         let old_value = self.registers[reg as usize];
         self.registers[reg as usize] = latched_value;
         let modified = old_value ^ latched_value;
-        info!("[VDP] Current latched value: {:02X}", latched_value);
+        info!("[VDP] Modified {} - bytes: {:08b}", modified, modified);
 
         // Handle register-specific functionality
         match reg {
-            0 | 1 => {
-                // Update mode, IRQ, sprites config, blinking, etc.
-                // Implement the functionality based on the WebMSX code
-                if modified & 0x10 != 0 {
+            0 => {
+                if modified & 0x10 == 0 {
+                    // Clear FH bit immediately when IE becomes 0? Not as per https://www.mail-archive.com/msx@stack.nl/msg13886.html
+                    // We clear it only at the beginning of the next line if IE === 0
+                    // Laydock2 has glitches on WebMSX with Turbo and also on a real Expert3 at 10MHz
+                    // if (((val & 0x10) === 0) && FH) FH = 0
+                    // update_irq();
                     info!(
                         "[VDP] Update IRQ (WIP) | Latched Value: 0x{:02X} | Data: 0x{:02X}",
                         latched_value, data
                     );
-                    // IE1: Frame interrupt enable
-                    // TODO self.update_irq();
                 }
-                if modified & 0x0E != 0 {
-                    // Mx: Update display mode
+                if modified & 0x0e == 0 {
                     info!(
                         "[VDP] Updating mode... | Latched Value: 0x{:02X} | Data: 0x{:02X}",
                         latched_value, data
                     );
                     self.update_mode();
                 }
-                if reg == 1 {
-                    if modified & 0x20 != 0 {
-                        info!("[VDP] Enable line interrupt | Latched Value: 0x{:02X} | Data: 0x{:02X}", latched_value, data);
-                        // IE0: Line interrupt enable
-                        // TODO self.update_irq();
-                    }
-                    if modified & 0x40 != 0 {
-                        info!(
-                            "[VDP] Update Blanking | Latched Value: 0x{:02X} | Data: 0x{:02X}",
-                            latched_value, data
-                        );
-                        // BL: Blanking
-                        // TODO self.update_blanking();
-                    }
-                    if modified & 0x18 != 0 {
-                        info!(
-                            "[VDP] Updating mode... | Latched Value: 0x{:02X} | Data: 0x{:02X}",
-                            latched_value, data
-                        );
-                        // Mx: Update display mode
-                        self.update_mode();
-                    }
-                    if modified & 0x04 != 0 {
-                        info!("[VDP] Update blinking (Undocumented) | Latched Value: 0x{:02X} | Data: 0x{:02X}", latched_value, data);
-                        // CDR: Update blinking (Undocumented)
-                        // TODO self.update_blinking();
-                    }
-                    if modified & 0x03 != 0 {
-                        info!("[VDP] Update sprites config | Latched Value: 0x{:02X} | Data: 0x{:02X}", latched_value, data);
-                        // SI, MAG: Update sprites config
-                        // TODO self.update_sprites_config();
-                    }
+            }
+            1 => {
+                // Update mode, IRQ, sprites config, blinking, etc.
+                // Implement the functionality based on the WebMSX code
+
+                if modified & 0x20 != 0 {
+                    // IE0
+                    info!(
+                        "[VDP] Enable line interrupt | Latched Value: 0x{:02X} | Data: 0x{:02X}",
+                        latched_value, data
+                    );
+                    // TODO self.update_irq();
+                }
+                if modified & 0x40 == 0 {
+                    // BL
+                    info!(
+                        "[VDP] Disable frame interrupt | Latched Value: 0x{:02X} | Data: 0x{:02X}",
+                        latched_value, data
+                    );
+                    // IE1: Frame interrupt enable
+                    // WebMSX blanking_change_pending = true
+                }
+                if modified & 0x18 == 0 {
+                    // Mx
+                    info!(
+                        "[VDP] Update mode | Latched Value: 0x{:02X} | Data: 0x{:02X}",
+                        latched_value, data
+                    );
+                    self.update_mode();
+                }
+                if modified & 0x04 == 0 { //CDR  (Undocumented, changes reg 13 timing to lines instead of frames)
+                     // TODO WebMSX updateBlinking();
+                }
+                if modified & 0x03 == 0 {
+                    info!(
+                        "[VDP] Update sprites | Latched Value: 0x{:02X} | Data: 0x{:02X}",
+                        latched_value, data
+                    );
+                    // TODO self.update_sprites();
                 }
             }
             2 => {
@@ -249,15 +256,28 @@ impl TMS9918 {
                     latched_value, data
                 );
                 // Update layout table address
-                // Implement the functionality based on the WebMSX code
+                // TODO WebMSX if (mod & 0x7f) updateLayoutTableAddress();
             }
-            3 | 10 => {
+            10 => {
                 info!(
                     "[VDP] Update color table address | Latched Value: 0x{:02X} | Data: 0x{:02X}",
                     latched_value, data
                 );
                 // Update color table address
                 // Implement the functionality based on the WebMSX code
+                // TODO WebMSX - if ((mod & 0x07) === 0) break; else fallthrough
+                // which I don't understand... fallthrough how?
+            }
+            3 => {
+                info!(
+                    "[VDP] Update pattern table address | Latched Value: 0x{:02X} | Data: 0x{:02X}",
+                    latched_value, data
+                );
+                // Update pattern table address
+                // TODO WebMSX
+                // add = ((register[10] << 14) | (register[3] << 6)) & 0x1ffff;
+                // colorTableAddress = add & modeData.colorTBase;
+                // colorTableAddressMask = add | colorTableAddressMaskBase;
             }
             4 => {
                 info!(
@@ -334,20 +354,22 @@ impl TMS9918 {
 
         if let Some(latched_value) = self.first_write {
             info!(
-                "[VDP] Latched: 0x{:02X} Received: 0x{:02X}",
+                "[VDP] Latched: 0x{:02X} Received: 0x{:02X} Is 0x80? {}",
+                latched_value,
                 data,
                 data & 0x80
             );
             if data & 0x80 == 0 {
                 info!(
                     "[VDP] Write Register: {:02X} <- Latched Value: {:02X}",
-                    latched_value, data,
+                    data, latched_value,
                 );
                 // Set register
                 // info!("[VDP] Set register: {:02X}", data);
                 // let reg = data & 0x07;
                 // info!("[VDP] Register is: {:08b}", reg);
                 // self.registers[reg as usize] = latched_value;
+                // self.write_register(data, latched_value);
                 self.write_register(data, latched_value);
                 info!("[VDP] Current latched value: {:02X}", latched_value);
                 // On V9918, the VRAM pointer high gets also written when writing to registers
