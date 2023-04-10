@@ -95,6 +95,7 @@ impl ReportState for Msx {
             sp: cpu.sp,
             pc: cpu.pc,
             hl: cpu.get_hl(),
+            bc: cpu.get_bc(),
             hl_contents: cpu.read_byte(cpu.get_hl()),
             opcode: cpu.read_byte(cpu.pc),
         })
@@ -208,23 +209,6 @@ impl Msx {
         let vdp = bus.vdp.clone();
         hexdump(&vdp.vram, 0, 0x4000)
     }
-
-    // pub fn load_binary(&mut self, path: &str) -> std::io::Result<()> {
-    //     let mut file = File::open(path)?;
-    //     let mut buffer = Vec::new();
-    //     file.read_to_end(&mut buffer)?;
-
-    //     self.cpu.load_bios(&buffer)?;
-
-    //     Ok(())
-    // }
-
-    // pub fn load_rom(&mut self, rom: &[u8]) -> std::io::Result<()> {
-    //     self.reset();
-    //     self.cpu.memory.load_bios(rom)?;
-
-    //     Ok(())
-    // }
 
     pub fn instruction(&mut self) -> ProgramEntry {
         let instr = Instruction::parse(&self.cpu);

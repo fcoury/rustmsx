@@ -43,6 +43,7 @@ impl ReportState for Client {
         let h = self.send("reg h")?.parse()?;
         let l = self.send("reg l")?.parse()?;
         let hl = self.send("reg hl")?.parse()?;
+        let bc = self.send("reg bc")?.parse()?;
         let hl_contents = self
             .send(&format!("debug read memory 0x{:04X}", hl))?
             .parse()?;
@@ -62,6 +63,7 @@ impl ReportState for Client {
             h,
             l,
             hl,
+            bc,
             hl_contents,
             opcode,
         })
