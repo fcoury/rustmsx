@@ -385,6 +385,7 @@ impl Runner {
             }
             Command::Step => {
                 self.step()?;
+                self.dump()?;
                 Ok(true)
             }
             Command::Continue => {
