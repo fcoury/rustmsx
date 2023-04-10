@@ -238,30 +238,33 @@ impl Z80 {
                 self.pc = self.pc.wrapping_add(1);
             }
             0xCF => {
-                // RST 30H
-                match self.c {
-                    0x02 => {
-                        // BDOS function 2: output a character
-                        print!("{}", self.e as char);
-                    }
-                    0x09 => {
-                        // BDOS function 9: output a string
-                        let mut current_address = self.get_de();
-                        loop {
-                            let current_char = self.read_byte(current_address);
-                            if current_char == b'$' {
-                                // String terminator
-                                break;
-                            }
-                            print!("{}", current_char as char);
-                            current_address = current_address.wrapping_add(1);
-                        }
-                    }
-                    _ => {
-                        panic!("Unhandled BDOS call: C = 0x{:02X}", self.c);
-                    }
-                }
-                self.pc = self.pc.wrapping_add(1);
+                // // RST 30H
+                // match self.c {
+                //     0x02 => {
+                //         // BDOS function 2: output a character
+                //         print!("{}", self.e as char);
+                //     }
+                //     0x09 => {
+                //         // BDOS function 9: output a string
+                //         let mut current_address = self.get_de();
+                //         loop {
+                //             let current_char = self.read_byte(current_address);
+                //             if current_char == b'$' {
+                //                 // String terminator
+                //                 break;
+                //             }
+                //             print!("{}", current_char as char);
+                //             current_address = current_address.wrapping_add(1);
+                //         }
+                //     }
+                //     _ => {
+                //         panic!("Unhandled BDOS call: C = 0x{:02X}", self.c);
+                //     }
+                // }
+                // self.pc = self.pc.wrapping_add(1);
+                // RST 00H
+                trace!("RST 08H");
+                self.rst(0x08);
             }
             0xC7 => {
                 // RST 00H
