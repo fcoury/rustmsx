@@ -79,6 +79,7 @@ impl<'a> Instruction<'a> {
             0xE7 => ("RST 20H", 1),
             0xEF => ("RST 28H", 1),
             0xFF => ("RST 38H", 1),
+            0xF7 => ("RST 30H", 1),
             0x3E => ("LD A, #$1", 2),
             0x06 => ("LD B, #$1", 2),
             0x0E => ("LD C, #$1", 2),
@@ -113,6 +114,7 @@ impl<'a> Instruction<'a> {
             0x57 => ("LD D, A", 1),
             0x50 => ("LD D, B", 1),
             0x51 => ("LD D, C", 1),
+            0x52 => ("LD D, D", 1),
             0x53 => ("LD D, E", 1),
             0x54 => ("LD D, H", 1),
             0x55 => ("LD D, L", 1),
@@ -179,6 +181,7 @@ impl<'a> Instruction<'a> {
             0x2B => ("DEC HL", 1),
             0x0B => ("DEC BC", 1),
             0x1B => ("DEC DE", 1),
+            0x3B => ("DEC SP", 1),
             0x35 => ("DEC (HL)", 1),
             0x87 => ("ADD A, A", 1),
             0x80 => ("ADD A, B", 1),
@@ -299,6 +302,7 @@ impl<'a> Instruction<'a> {
             0xCC => ("CALL Z, #$2$1", 3),
             0xC4 => ("CALL NZ, #$2$1", 3),
             0xDC => ("CALL C, #$2$1", 3),
+            0xE4 => ("CALL PO, #$2$1", 3),
             0xFC => ("CALL M, #$2$1", 3),
             0xCD => ("CALL #$2$1", 3),
             0xC9 => ("RET", 1),
@@ -308,6 +312,7 @@ impl<'a> Instruction<'a> {
             0xD0 => ("RET NC", 1),
             0xF8 => ("RET M", 1),
             0xE0 => ("RET PO", 1),
+            0xE8 => ("RET PE", 1),
             0xF0 => ("RET P", 1),
             0xC5 => ("PUSH BC", 1),
             0xD5 => ("PUSH DE", 1),
@@ -331,6 +336,7 @@ impl<'a> Instruction<'a> {
             0x30 => ("JR NC, #$1", 2),
             0x38 => ("JR C, #$1", 2),
             0x0F => ("RRCA", 1),
+            0x1F => ("RRA", 1),
             0xCB => {
                 // Read extended opcode and execute it
                 let extended_opcode = self.cpu.read_byte(self.pc.wrapping_add(1));

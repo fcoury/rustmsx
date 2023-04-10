@@ -48,7 +48,7 @@ impl Reducer<ComputerState> for Msg {
                     return store;
                 }
 
-                for _ in 0..10000 {
+                for _ in 0..50000 {
                     state.msx.borrow_mut().step();
 
                     if state.msx.borrow().current_scanline == 0 {

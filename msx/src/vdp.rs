@@ -91,9 +91,26 @@ impl TMS9918 {
 
     // Pattern Table Base Address = register 2 * 0x400
     pub fn pattern_table(&self) -> &[u8] {
-        let base_address = self.registers[2] as usize * 0x400;
-        let pattern_table_size = 256 * 8; // Assuming 256 characters, 8 bytes per character
+        // let base_address = self.registers[2] as usize * 0x400;
+        let base_address = 0x0000;
+        let pattern_table_size = 6 * 1027; // 6k
+                                           // let pattern_table_size = 256 * 8; // Assuming 256 characters, 8 bytes per character
+                                           // tracing::info!("pattern table base_address: {:04X}", base_address);
         &self.vram[base_address..(base_address + pattern_table_size)]
+    }
+
+    pub fn color_table(&self) -> &[u8] {
+        // Calculate the base address of the color table using register R#3
+        // let ct_base = (self.registers[3] as usize & 0x7F) * 0x040;
+        let ct_base = 0x2000;
+        let ct_table_size = 6 * 1027; // 6k
+                                      // tracing::info!("color table base_address: {:04X}", ct_base);
+        &self.vram[ct_base..(ct_base + ct_table_size)]
+    }
+
+    pub fn get_horizontal_scroll_high(&self) -> usize {
+        // Calculate the horizontal scroll value using register R#0
+        (self.registers[0] as usize & 0x07) * 8
     }
 
     pub fn vram_read_np(&self, address: usize) -> usize {
@@ -124,12 +141,12 @@ impl TMS9918 {
     }
 
     fn write_98(&mut self, data: u8) {
-        if data.is_ascii_graphic() {
-            info!(
-                "[VDP] Port: 98 | Address: {:04X} | Data: 0x{:02X} ({}).",
-                self.address, data, data as char
-            );
-        }
+        // if data.is_ascii_graphic() {
+        //     info!(
+        //         "[VDP] Port: 98 | Address: {:04X} | Data: 0x{:02X} ({}).",
+        //         self.address, data, data as char
+        //     );
+        // }
 
         self.vram[self.address as usize] = data;
         self.data_pre_read = data;

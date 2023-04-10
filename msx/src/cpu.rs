@@ -497,6 +497,10 @@ impl Z80 {
                 self.pc = self.pc.wrapping_add(1);
                 self.d = self.b;
             }
+            0x52 => {
+                // LD D, D
+                self.pc = self.pc.wrapping_add(1);
+            }
             0x51 => {
                 // LD D, C
                 self.pc = self.pc.wrapping_add(1);
@@ -912,6 +916,12 @@ impl Z80 {
                 self.set_de(de);
                 self.pc = self.pc.wrapping_add(1);
                 trace!("DEC DE");
+            }
+            0x3B => {
+                // DEC SP
+                self.sp = self.sp.wrapping_sub(1);
+                self.pc = self.pc.wrapping_add(1);
+                trace!("DEC SP");
             }
             0x35 => {
                 // DEC (HL)
@@ -1648,6 +1658,16 @@ impl Z80 {
                     self.pc = self.pc.wrapping_add(3);
                 }
             }
+            0xE4 => {
+                // CALL PO, nn
+                let address = self.read_word(self.pc.wrapping_add(1));
+                if !self.get_flag(Flag::P) {
+                    self.push(self.pc.wrapping_add(3));
+                    self.pc = address;
+                } else {
+                    self.pc = self.pc.wrapping_add(3);
+                }
+            }
             0xFC => {
                 trace!("CALL M, {:04X}", self.pc);
                 // CALL M, nn
@@ -1745,6 +1765,16 @@ impl Z80 {
                 } else {
                     self.pc = self.pc.wrapping_add(1);
                     trace!("NOP (RET PO not taken)");
+                }
+            }
+            0xE8 => {
+                // RET PE
+                if self.get_flag(Flag::P) {
+                    self.pc = self.pop();
+                    trace!("RET PE");
+                } else {
+                    self.pc = self.pc.wrapping_add(1);
+                    trace!("NOP (RET PE not taken)");
                 }
             }
             0xC5 => {
@@ -1927,6 +1957,23 @@ impl Z80 {
                 self.pc = self.pc.wrapping_add(1);
                 trace!("RRC A");
             }
+            0x1F => {
+                // RRA
+                let a = self.a;
+                let carry = a & 0x01 != 0;
+                let result = (a >> 1) | ((self.get_flag(Flag::C) as u8) << 7);
+
+                self.a = result;
+                self.set_flag(Flag::S, result & 0x80 != 0);
+                self.set_flag(Flag::Z, result == 0);
+                self.set_flag(Flag::H, false);
+                self.set_flag(Flag::P, result.count_ones() % 2 == 0);
+                self.set_flag(Flag::N, false);
+                self.set_flag(Flag::C, carry);
+
+                self.pc = self.pc.wrapping_add(1);
+                trace!("RRA");
+            }
             0xCB => {
                 // Read extended opcode and execute it
                 let extended_opcode = self.read_byte(self.pc.wrapping_add(1));
@@ -2059,10 +2106,10 @@ impl Z80 {
                 let data = self.a;
 
                 // if port >= 0x90 {
-                info!(
-                    "PC = #{:04X} OUT (n), A | Port = #{:02X} | Data = 0x{:02X}",
-                    self.pc, port, data
-                );
+                // info!(
+                //     "PC = #{:04X} OUT (n), A | Port = #{:02X} | Data = 0x{:02X}",
+                //     self.pc, port, data
+                // );
                 // }
 
                 {
@@ -2151,13 +2198,13 @@ impl Z80 {
                         let port = self.c;
 
                         // if port >= 0x90 {
-                        info!(
-                            "PC = #{:04X} OUTI | HL (0x{:04X}) | Port = #{:02X} | Data = 0x{:02X}",
-                            self.pc,
-                            self.get_hl(),
-                            port,
-                            value
-                        );
+                        // info!(
+                        //     "PC = #{:04X} OUTI | HL (0x{:04X}) | Port = #{:02X} | Data = 0x{:02X}",
+                        //     self.pc,
+                        //     self.get_hl(),
+                        //     port,
+                        //     value
+                        // );
                         // }
 
                         {
@@ -2180,10 +2227,10 @@ impl Z80 {
                         let value = self.d;
 
                         // if port >= 0x90 {
-                        info!(
-                            "PC = #{:04X} OUT (C), D | Port = #{:02X} | Data = 0x{:02X}",
-                            self.pc, port, value
-                        );
+                        // info!(
+                        //     "PC = #{:04X} OUT (C), D | Port = #{:02X} | Data = 0x{:02X}",
+                        //     self.pc, port, value
+                        // );
                         // }
 
                         {
