@@ -10,44 +10,58 @@ use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 #[derive(Parser, Debug)]
 pub struct Cli {
+    /// Path to the complete ROM file
     rom_path: PathBuf,
 
+    /// Maximum number of cycles to run before breaking
     #[clap(short = 'c', long)]
     max_cycles: Option<u64>,
 
+    /// Track flag changes
     #[clap(short, long)]
     track_flags: bool,
 
+    /// Break on the given address(es)
     #[clap(short, long)]
     breakpoint: Vec<String>,
 
+    /// Runs openMSX in paralell
     #[clap(short, long)]
     open_msx: bool,
 
+    /// Break on CPU registers and flags mismatch between openMSX and emulator
     #[clap(short = 'm', long)]
     break_on_mismatch: bool,
 
+    /// Break on memory mismatch between openMSX and emulator
     #[clap(short = 'e', long)]
     break_on_mem_mismatch: bool,
 
+    /// Break on HALT instruction
     #[clap(long)]
     break_on_halt: bool,
 
+    /// Dump a log on mismatch between openMSX and emulator
     #[clap(short, long)]
     log_on_mismatch: bool,
 
+    /// Dump a log every n cycles
     #[clap(short, long)]
     report_every: Option<u64>,
 
+    /// Break on PPI write operations
     #[clap(short = 'p', long)]
     break_on_ppi_write: bool,
 
+    /// Enable debug logging
     #[clap(short, long)]
     debug: bool,
 
+    /// Enable debug logging for the VDP
     #[clap(long)]
     debug_vdp: bool,
 
+    /// Enable debug logging for the PPI
     #[clap(long)]
     debug_ppi: bool,
 }
@@ -69,7 +83,7 @@ pub fn main() -> anyhow::Result<()> {
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
     let mut runner = RunnerBuilder::new()
-        .rom_slot_from_file(cli.rom_path, 0x0000, 0xC000)?
+        .rom_slot_from_file(cli.rom_path, 0x0000, 0x10000)?
         // .ram_slot(0x0000, 0xFFFF)
         // .ram_slot(0x0000, 0xFFFF)
         .empty_slot()

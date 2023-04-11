@@ -71,6 +71,11 @@ impl RomSlot {
     pub fn new(rom: &[u8], base: u16, size: u32) -> Self {
         let mut data = vec![0xFF; size as usize];
         data[0..rom.len()].copy_from_slice(rom);
+
+        if rom.len() < size as usize {
+            data[rom.len()..].copy_from_slice(&rom[0..(size as usize - rom.len())]);
+        }
+
         RomSlot {
             base,
             size,
