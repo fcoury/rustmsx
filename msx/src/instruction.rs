@@ -73,6 +73,7 @@ impl<'a> Instruction<'a> {
     pub fn as_def(&self) -> (&str, u8) {
         match self.opcode {
             0x00 => ("NOP", 1),
+            0xCF => ("RST 08H", 1),
             0xC7 => ("RST 00H", 1),
             0xD7 => ("RST 10H", 1),
             0xDF => ("RST 18H", 1),
@@ -85,7 +86,9 @@ impl<'a> Instruction<'a> {
             0x0E => ("LD C, #$1", 2),
             0x16 => ("LD D, #$1", 2),
             0x64 => ("LD H, H", 1),
-            0x56 => ("LD D, E", 1),
+            0x46 => ("LD B, (HL)", 1),
+            0x4E => ("LD C, (HL)", 1),
+            0x56 => ("LD D, (HL)", 1),
             0x66 => ("LD H, (HL)", 1),
             0x5E => ("LD E, (HL)", 1),
             0x1E => ("LD E, #$1", 2),
@@ -302,6 +305,7 @@ impl<'a> Instruction<'a> {
             0xCC => ("CALL Z, #$2$1", 3),
             0xC4 => ("CALL NZ, #$2$1", 3),
             0xDC => ("CALL C, #$2$1", 3),
+            0xD4 => ("CALL NC, #$2$1", 3),
             0xE4 => ("CALL PO, #$2$1", 3),
             0xFC => ("CALL M, #$2$1", 3),
             0xCD => ("CALL #$2$1", 3),
@@ -360,11 +364,13 @@ impl<'a> Instruction<'a> {
                 match extended_opcode {
                     0xB0 => ("LDIR", 2),
                     0x42 => ("SBC HL, BC", 2),
+                    0x52 => ("SBC HL, DE", 2),
                     0x56 => ("IM 1", 2),
                     0xA2 => ("INI", 2),
                     0xA3 => ("OUTI", 2),
                     0x51 => ("OUT (C), D", 2),
                     0x58 => ("OUT (C), E", 2),
+                    0x53 => ("LD ($2$1), DE", 4),
                     0x5B => ("LD DE, ($2$1)", 4),
                     _ => {
                         error!("Unknown opcode (ED) 0xED 0x{:02X}", extended_opcode);
