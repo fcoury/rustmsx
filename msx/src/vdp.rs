@@ -15,10 +15,10 @@ pub struct Sprite {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum DisplayMode {
-    Text1,
-    Multicolor,
-    Graphic1,
-    Graphic2,
+    Text1,      // screen 0 - 40x80 text
+    Graphic1,   // screen 1 - 32x64 multicolor
+    Graphic2,   // screen 2 - 256x192 4-color
+    Multicolor, // screen 3 - 256x192 16-color
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -89,14 +89,55 @@ impl TMS9918 {
         self.vblank = false;
     }
 
-    // Pattern Table Base Address = register 2 * 0x400
-    pub fn pattern_table(&self) -> &[u8] {
-        // let base_address = self.registers[2] as usize * 0x400;
-        let base_address = 0x0000;
-        let pattern_table_size = 6 * 1027; // 6k
-                                           // let pattern_table_size = 256 * 8; // Assuming 256 characters, 8 bytes per character
-                                           // tracing::info!("pattern table base_address: {:04X}", base_address);
-        &self.vram[base_address..(base_address + pattern_table_size)]
+    pub fn name_table_base_and_size(&self) -> (usize, usize) {
+        // Calculate the base address of the name table using register R#2
+        // let nt_base = (self.registers[2] as usize & 0x0F) * 0x0400;
+        // let nt_table_size = 1024;
+        // &self.vram[nt_base..(nt_base + nt_table_size)]
+
+        // returns the name table based on the MSX Red Book definition
+        match self.display_mode {
+            DisplayMode::Text1 => (0x0000, 960),
+            DisplayMode::Graphic1 => (0x1800, 768),
+            DisplayMode::Graphic2 => (0x1800, 768),
+            DisplayMode::Multicolor => (0x0800, 768),
+        }
+    }
+
+    // pub fn name_table(&self) -> &[u8] {
+    //     // Calculate the base address of the name table using register R#2
+    //     // let nt_base = (self.registers[2] as usize & 0x0F) * 0x0400;
+    //     // let nt_table_size = 1024;
+    //     // &self.vram[nt_base..(nt_base + nt_table_size)]
+
+    //     // returns the name table based on the MSX Red Book definition
+    //     let (base_address, end_address) = match self.display_mode {
+    //         DisplayMode::Text1 => (0x0000, 0x03BF),
+    //         DisplayMode::Graphic1 => (0x1800, 0x1AFF),
+    //         DisplayMode::Graphic2 => (0x1800, 0x1AFF),
+    //         DisplayMode::Multicolor => (0x0800, 0x0AFF),
+    //     };
+
+    //     &self.vram[base_address..=end_address]
+    // }
+
+    // Character Pattern Table Base Address = register 2 * 0x400
+    pub fn char_pattern_table(&self) -> &[u8] {
+        let base_address = match self.display_mode {
+            DisplayMode::Text1 => 0x0800,
+            DisplayMode::Graphic1 => 0x0000,
+            DisplayMode::Graphic2 => 0x0000,
+            DisplayMode::Multicolor => 0x0000,
+        };
+
+        let size = match self.display_mode {
+            DisplayMode::Text1 => 2 * 1024,
+            DisplayMode::Graphic1 => 2 * 1024,
+            DisplayMode::Graphic2 => 6 * 1024,
+            DisplayMode::Multicolor => 1536,
+        };
+
+        &self.vram[base_address..(base_address + size)]
     }
 
     pub fn color_table(&self) -> &[u8] {
