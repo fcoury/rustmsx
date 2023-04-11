@@ -2150,6 +2150,8 @@ impl Z80 {
                         }
 
                         if self.get_bc() == 0 {
+                            self.set_flag(Flag::N, false);
+                            self.set_flag(Flag::H, false);
                             self.set_flag(Flag::P, false); // Reset P/V flag
                             self.pc = self.pc.wrapping_add(1);
                         } else {
