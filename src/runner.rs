@@ -499,6 +499,12 @@ impl Runner {
                 Ok(true)
             }
             Command::VramDump(target) => {
+                if self.client.is_none() {
+                    println!("VRAM dump");
+                    println!("{}", self.msx.vram_dump());
+                    return Ok(true);
+                }
+
                 match target {
                     DumpTarget::Msx => {
                         println!("VRAM dump");
@@ -528,6 +534,12 @@ impl Runner {
             Command::MemDump(target) => {
                 let start = 0u16;
                 let end = (self.msx.mem_size() - 1) as u16;
+
+                if self.client.is_none() {
+                    println!("Memory dump from {:#06X} to {:#06X}", start, end);
+                    println!("{}", self.msx.memory_dump(start, end));
+                    return Ok(true);
+                }
 
                 match target {
                     DumpTarget::Msx => {
